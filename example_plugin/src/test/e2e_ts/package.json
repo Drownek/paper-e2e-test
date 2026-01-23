@@ -1,0 +1,13 @@
+{
+  "type": "module",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@drownek/paper-e2e-runner": "file:D:/PROJECTS/01_Drafts/paper-e2e-test-framework/runner-package"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@types/node": "^22.10.5"
+  }
+}

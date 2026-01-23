@@ -1,0 +1,79 @@
+# Node
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Gradle
+.gradle/
+build/
+.gradletasknamecache
+gradle-app.setting
+!gradle-wrapper.jar
+*.class
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+.project
+.classpath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# TypeScript
+*.tsbuildinfo
+dist/
+
+# Test server runtime
+run/
+test-server/
+**/server.properties
+**/eula.txt
+**/banned-*.json
+**/ops.json
+**/whitelist.json
+**/usercache.json
+**/world/
+**/world_nether/
+**/world_the_end/
+**/cache/
+**/versions/
+**/libraries/
+**/plugins/**/*.jar
+!**/plugins/.gitkeep
+**/paper.jar
+**/bukkit.jar
+**/spigot.jar
+server.jar
+
+# Compiled test files
+**/e2e/dist/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.old
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
