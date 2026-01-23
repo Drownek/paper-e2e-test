@@ -1,6 +1,6 @@
 {
   "name": "@drownek/paper-e2e-runner",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "End-to-end testing framework for Paper/Spigot Minecraft plugins",
   "type": "module",
   "main": "dist/runner.js",
@@ -25,6 +25,15 @@
   ],
   "author": "drownek",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drownek/paper-e2e-test.git",
+    "directory": "runner-package"
+  },
+  "homepage": "https://github.com/drownek/paper-e2e-test#readme",
+  "bugs": {
+    "url": "https://github.com/drownek/paper-e2e-test/issues"
+  },
   "dependencies": {
     "mineflayer": "^4.0.0"
   },
@@ -34,5 +43,8 @@
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

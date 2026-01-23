@@ -49,7 +49,7 @@ Create `src/test/e2e/package.json`:
 {
   "type": "module",
   "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.0.0"
+    "@drownek/paper-e2e-runner": "^1.0.1"
   }
 }
 ```

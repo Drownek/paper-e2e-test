@@ -1,6 +1,6 @@
 {
     "type": "module",
     "dependencies": {
-        "@drownek/paper-e2e-runner": "^1.0.0"
+        "@drownek/paper-e2e-runner": "^1.0.1"
     }
 }
