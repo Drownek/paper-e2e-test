@@ -2,6 +2,8 @@
 
 End-to-end testing framework for Paper/Spigot Minecraft plugins with support for both JavaScript and TypeScript.
 
+> **Note:** The plugin has been published to Gradle Plugin Portal and is awaiting verification. Until then, use `./gradlew publishToMavenLocal` to install locally.
+
 ## Features
 
 - 🚀 Simple setup - start testing in minutes
