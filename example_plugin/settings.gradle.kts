@@ -1,10 +1,10 @@
 pluginManagement {
     repositories {
-        mavenLocal()
+//        mavenLocal()
         gradlePluginPortal()
     }
 }
 
-includeBuild("../gradle-plugin")
+//includeBuild("../gradle-plugin")
 
 rootProject.name = "example-plugin"
