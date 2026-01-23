@@ -2,28 +2,6 @@
 
 Common issues and their solutions.
 
-## Installation Issues
-
-### "Cannot find module '@drownek/paper-e2e-runner'"
-
-**Cause:** npm dependencies not installed.
-
-**Solution:**
-```bash
-cd src/test/e2e
-npm install
-```
-
-### "Plugin 'me.drownek.paper-e2e' not found"
-
-**Cause:** Gradle plugin not published to Maven Local.
-
-**Solution:**
-```bash
-cd gradle-plugin
-./gradlew publishToMavenLocal
-```
-
 ## Server Issues
 
 ### "Server JAR not found"
@@ -32,7 +10,7 @@ cd gradle-plugin
 
 **Solution 1 - Auto download:**
 ```kotlin
-paperE2E {
+e2e {
     autoDownloadServer.set(true)
 }
 ```
@@ -73,7 +51,7 @@ kill -9 <process_id>
 
 **Solution:**
 ```kotlin
-paperE2E {
+e2e {
     acceptEula.set(true)
 }
 ```
@@ -124,24 +102,6 @@ test('message test', async ({ player }) => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   await expect(player).toHaveReceivedMessage('Welcome');
 });
-```
-
-### "Plugin not found in server"
-
-**Cause:** Plugin JAR not copied to plugins folder.
-
-**Solution:**
-Verify `pluginJar` configuration:
-
-```kotlin
-paperE2E {
-    pluginJar.set(tasks.shadowJar.flatMap { it.archiveFile })
-}
-```
-
-Ensure your build task completes before running tests:
-```bash
-./gradlew build testE2E
 ```
 
 ## TypeScript Issues
@@ -271,17 +231,17 @@ test('debug test', async ({ player }) => {
 
 If you're still stuck:
 
-1. Check [GitHub Issues](https://github.com/yourusername/paper-e2e-test-framework/issues)
+1. Check [GitHub Issues](https://github.com/Drownek/paper-e2e-test/issues)
 2. Review [Examples](Examples) for working code
-3. Enable debug logging and share logs
+3. Share logs
 4. Verify your setup matches [Getting Started](Getting-Started)
 
 ## Common Error Messages
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `EADDRINUSE` | Port 25565 in use | Kill process on port 25565 |
-| `MODULE_NOT_FOUND` | Missing dependencies | Run `npm install` |
-| `AssertionError` | Test assertion failed | Check test logic |
-| `TimeoutError` | Operation took too long | Increase timeout or fix root cause |
-| `ECONNREFUSED` | Server not ready | Add delay or check server startup |
+| Error              | Cause                   | Solution                           |
+|--------------------|-------------------------|------------------------------------|
+| `EADDRINUSE`       | Port 25565 in use       | Kill process on port 25565         |
+| `MODULE_NOT_FOUND` | Missing dependencies    | Run `npm install`                  |
+| `AssertionError`   | Test assertion failed   | Check test logic                   |
+| `TimeoutError`     | Operation took too long | Increase timeout or fix root cause |
+| `ECONNREFUSED`     | Server not ready        | Add delay or check server startup  |

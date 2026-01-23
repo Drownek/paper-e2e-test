@@ -48,7 +48,7 @@ Strict equality using `Object.is()`. Use for primitives.
 expect(42).toBe(42);
 expect('hello').toBe('hello');
 expect(true).toBe(true);
-expect(player.username).toBe('TestPlayer_123');
+expect(player.username).toBe('TestBot_123');
 ```
 
 ### toEqual(value)
@@ -136,7 +136,7 @@ expect(Math.PI).toBeCloseTo(3.14, 2);
 ```javascript
 expect('Hello World').toMatch(/World/);
 expect('Hello World').toMatch('World');
-expect(player.username).toMatch(/TestPlayer_\d+/);
+expect(player.username).toMatch(/TestBot_\d+/);
 
 // Negation
 expect('Hello').not.toMatch(/goodbye/);
@@ -318,7 +318,7 @@ test('player stats command displays correctly', async ({ player, server }) => {
   expect(diamond.count).toBeGreaterThanOrEqual(5);
   
   // Verify username format
-  expect(player.username).toMatch(/TestPlayer_\d+/);
+  expect(player.username).toMatch(/TestBot_\d+/);
   
   // Check we didn't get error messages
   await expect(player).not.toHaveReceivedMessage('Error');

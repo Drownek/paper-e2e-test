@@ -1,15 +1,11 @@
 package me.drownek.papere2e
 
+import com.google.gson.JsonParser
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
-import org.gradle.api.tasks.Input
-import org.gradle.api.tasks.InputDirectory
-import org.gradle.api.tasks.Internal
-import org.gradle.api.tasks.Nested
-import org.gradle.api.tasks.Optional
-import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.*
 import org.gradle.jvm.toolchain.JavaLauncher
 import java.io.File
 import java.net.URI
@@ -18,7 +14,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import com.google.gson.JsonParser
 
 abstract class TestE2ETask : DefaultTask() {
 
@@ -295,7 +290,7 @@ abstract class TestE2ETask : DefaultTask() {
 
     private fun runCommand(dir: File, vararg command: String, env: Map<String, String> = emptyMap()) {
         val isWindows = System.getProperty("os.name").lowercase().contains("win")
-        val cmd = if (isWindows && command[0] == "npm") {
+        val cmd = if (isWindows && (command[0] == "npm" || command[0] == "node")) {
             listOf("cmd", "/c") + command
         } else {
             command.toList()

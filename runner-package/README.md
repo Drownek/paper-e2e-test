@@ -21,7 +21,7 @@ test('player can join server', async ({ player }) => {
 
 ## Documentation
 
-Full documentation is available in the [GitHub repository Wiki](https://github.com/yourusername/paper-e2e-test-framework/wiki).
+Full documentation is available in the [GitHub repository Wiki](https://github.com/Drownek/paper-e2e-test/wiki).
 
 ## License
 

@@ -8,7 +8,7 @@ To publish these pages to your GitHub wiki:
 
 1. Clone the wiki repository:
    ```bash
-   git clone https://github.com/yourusername/paper-e2e-test-framework.wiki.git
+   git clone https://github.com/Drownek/paper-e2e-test.wiki.git
    ```
 
 2. Copy all `.md` files from this directory to the wiki repository
@@ -34,4 +34,4 @@ To publish these pages to your GitHub wiki:
 
 ## Editing
 
-Edit the markdown files in this directory and republish to update the wiki.
+Edit the Markdown files in this directory and republish to update the wiki.

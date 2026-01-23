@@ -2,6 +2,10 @@
 
 Real-world test examples for common plugin features.
 
+## More Examples
+
+For additional TypeScript test examples, see the [StaffActivityMonitor project](https://github.com/Drownek/StaffActivityMonitor/tree/master/bukkit/src/test/e2e).
+
 ## Basic Command Testing
 
 ```javascript
@@ -9,7 +13,7 @@ import { test, expect } from '@drownek/paper-e2e-runner';
 
 test('help command shows available commands', async ({ player }) => {
   await player.chat('/help');
-  await expect(player).toHaveReceivedMessage('Available commands');
+  await expect(player).toHaveReceivedMessage('Help: Index');
 });
 
 test('unknown command shows error', async ({ player }) => {

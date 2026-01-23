@@ -12,7 +12,7 @@ In your `src/test/e2e/package.json`:
 {
   "type": "module",
   "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.0.1"
+    "@drownek/paper-e2e-runner": "^1.0.2"
   },
   "devDependencies": {
     "typescript": "^5.0.0",
@@ -132,33 +132,17 @@ src/test/e2e/
 ```typescript
 import { test, expect } from '@drownek/paper-e2e-runner';
 
-interface PlayerStats {
-  kills: number;
-  deaths: number;
-  level: number;
-}
+test('plugin loads and handles commands', async ({ player }) => {
+    await player.chat('/staffactivity reload');
+    await expect(player).toHaveReceivedMessage("You don't have permission");
+});
 
-function parseStats(message: string): PlayerStats {
-  const matches = message.match(/Kills: (\d+), Deaths: (\d+), Level: (\d+)/);
-  if (!matches) throw new Error('Invalid stats format');
-  
-  return {
-    kills: parseInt(matches[1]),
-    deaths: parseInt(matches[2]),
-    level: parseInt(matches[3])
-  };
-}
+test('op player can reload plugin config', async ({ player, server }) => {
+    await server.execute(`op ${player.username}`);
+    await new Promise(r => setTimeout(r, 500));
 
-test('player stats are tracked', async ({ player }) => {
-  await player.chat('/stats');
-  
-  // TypeScript ensures type safety
-  const statsMessage = await player.bot.waitForMessage(/Kills:/);
-  const stats = parseStats(statsMessage);
-  
-  expect(stats.kills).toBeGreaterThanOrEqual(0);
-  expect(stats.deaths).toBeGreaterThanOrEqual(0);
-  expect(stats.level).toBeGreaterThan(0);
+    await player.chat('/staffactivity reload');
+    await expect(player).toHaveReceivedMessage('Config reloaded');
 });
 ```
 
@@ -169,6 +153,10 @@ test('player stats are tracked', async ({ player }) => {
 - TypeScript catches errors at compile time
 - Both formats work with the same test runner
 - No performance difference between JS and TS
+
+## More Examples
+
+For additional TypeScript test examples, see the [StaffActivityMonitor project](https://github.com/Drownek/StaffActivityMonitor/tree/master/bukkit/src/test/e2e).
 
 ## Next Steps
 

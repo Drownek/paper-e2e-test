@@ -14,8 +14,8 @@ export class Matchers<T = unknown> {
         this.isNot = isNot;
     }
 
-    get not(): Matchers<T> {
-        return new (this.constructor as new (actual: T, isNot: boolean) => Matchers<T>)(this.actual, !this.isNot);
+    get not(): this {
+        return new (this.constructor as new (actual: T, isNot: boolean) => this)(this.actual, !this.isNot);
     }
 
     protected _assert(condition: boolean, passMessage: string, failMessage: string): void {

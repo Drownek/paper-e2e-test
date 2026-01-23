@@ -15,24 +15,18 @@ Add the plugin to your `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("me.drownek.paper-e2e") version "1.0.1"
+    id("me.drownek.paper-e2e") version "1.0.2"
 }
 
-repositories {
-    mavenLocal()  // Required for local development
-}
-
-paperE2E {
+e2e {
     minecraftVersion.set("1.19.4")
-    serverDir.set("run")
     testsDir.set(file("src/test/e2e"))
     autoDownloadServer.set(true)
     acceptEula.set(true)
-    
-    // Point to your built plugin JAR
-    pluginJar.set(tasks.shadowJar.flatMap { it.archiveFile })
 }
 ```
+
+**Note:** The plugin automatically detects and uses the output from `shadowJar`, `reobfJar`, or `jar` tasks, so you don't need to manually configure the plugin JAR path.
 
 ## Step 2: Initialize Test Directory
 
@@ -49,10 +43,15 @@ Create `package.json`:
 {
   "type": "module",
   "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.0.1"
+    "@drownek/paper-e2e-runner": "^1.0.2"
+  },
+  "devDependencies": {
+    "mineflayer": "^4.0.0"
   }
 }
 ```
+
+**Note:** Adding `mineflayer` as a dev dependency is optional but recommended - it provides TypeScript types and allows you to access the full Mineflayer bot API for advanced use cases.
 
 Install dependencies:
 
@@ -150,7 +149,7 @@ import { test, expect } from '@drownek/paper-e2e-runner';
 
 test('framework is working', async ({ player, server }) => {
   // Bot connected
-  expect(player.bot.username).toContain('TestPlayer_');
+  expect(player.bot.username).toContain('TestBot_');
   
   // Server is running
   await server.execute('version');

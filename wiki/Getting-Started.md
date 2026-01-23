@@ -9,35 +9,22 @@
 
 ## Installation
 
-### 1. Build & Publish the Plugin (One Time Setup)
 
-First, publish the Gradle plugin to your local Maven repository:
-
-```bash
-cd gradle-plugin
-./gradlew publishToMavenLocal
-```
-
-### 2. Configure Your Plugin
+### 1. Configure Your Plugin
 
 Add the plugin to your `build.gradle.kts`:
 
 ```kotlin
 plugins {
-    id("me.drownek.paper-e2e") version "1.0.1"
+    id("me.drownek.paper-e2e") version "1.0.2"
 }
 
-repositories {
-    mavenLocal()
-}
-
-paperE2E {
+e2e {
     minecraftVersion.set("1.19.4")
-    serverDir.set("run")
+    runDir.set("run")
     testsDir.set(file("src/test/e2e"))
     autoDownloadServer.set(true)
     acceptEula.set(true)
-    pluginJar.set(tasks.shadowJar.flatMap { it.archiveFile })
 }
 ```
 
@@ -49,7 +36,7 @@ Create `src/test/e2e/package.json`:
 {
   "type": "module",
   "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.0.1"
+    "@drownek/paper-e2e-runner": "^1.0.2"
   }
 }
 ```

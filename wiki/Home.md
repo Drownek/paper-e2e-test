@@ -21,5 +21,5 @@ Welcome to the Paper E2E Test Framework documentation!
 
 ## Quick Links
 
-- [GitHub Repository](https://github.com/yourusername/paper-e2e-test-framework)
+- [GitHub Repository](https://github.com/Drownek/paper-e2e-test)
 - [npm Package](https://www.npmjs.com/package/@drownek/paper-e2e-runner)

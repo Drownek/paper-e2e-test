@@ -196,7 +196,7 @@ test('admin GUI has correct items', async ({ player, server }) => {
   
   const gui = await player.waitForGui('Admin Panel');
   
-  const items = gui.findAllItems(() => true); // Get all items
+  const items = gui.getItems(); // Get all items
   expect(items.length).toBeGreaterThan(5);
   
   const reloadButton = gui.findItem(item => 
@@ -211,7 +211,6 @@ test('admin GUI has correct items', async ({ player, server }) => {
 - GUI operations are async - always use `await`
 - Use `findItem` for single items, `findAllItems` for collections
 - Custom display names differ from Minecraft item names
-- GUIs automatically close after test completes
 - Check logs if GUI doesn't open - the command might have failed
 
 ## Next Steps
