@@ -9,7 +9,7 @@
     "paper-e2e-runner": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc && node fix-types.js",
+    "build": "tsc",
     "prepublishOnly": "npm run build"
   },
   "files": [
