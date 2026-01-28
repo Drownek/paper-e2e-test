@@ -2,7 +2,7 @@ plugins {
     `java-library`
     id("de.eldoria.plugin-yml.bukkit") version "0.8.0"
     id("com.gradleup.shadow") version "9.0.0-beta12"
-    id("io.github.drownek.paper-e2e") version "1.0.2"
+    id("io.github.drownek.paper-e2e") version "1.0.3"
 }
 
 e2e {

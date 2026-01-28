@@ -16,7 +16,7 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 
 ```kotlin
 plugins {
-    id("io.github.drownek.paper-e2e") version "1.0.2"
+    id("io.github.drownek.paper-e2e") version "1.0.3"
 }
 
 paperE2E {
@@ -35,7 +35,7 @@ Create `src/test/e2e/package.json`:
 {
   "type": "module",
   "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.0.2"
+    "@drownek/paper-e2e-runner": "^1.0.3"
   }
 }
 ```

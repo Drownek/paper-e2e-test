@@ -77,13 +77,25 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         super(actual, isNot);
     }
 
+    private async waitAbit(ms: number = 500) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
     async toHaveReceivedMessage(this: RunnerMatchers<PlayerWrapper>, expectedMessage: string, strict: boolean = false): Promise<void> {
         const player = this.actual;
         const bot = player.bot;
         const isMatch = (msg: string): boolean => strict ? msg === expectedMessage : msg.includes(expectedMessage);
 
-        const checkFn = (): string | undefined => messageBuffer.find(isMatch);
+        if (this.isNot) {
+            await this.waitAbit(500);
+            const found = messageBuffer.find(isMatch);
+            if (found) {
+                throw new Error(`Expected NOT to receive message matching "${expectedMessage}", but received: "${found}"`);
+            }
+            return;
+        }
 
+        const checkFn = (): string | undefined => messageBuffer.find(isMatch);
         await waitFor(
             checkFn,
             bot,
@@ -101,16 +113,17 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         const bot = player.bot;
         const checkFn = (): boolean => bot.inventory.items().some(item => item.name.includes(itemName));
 
-        await waitFor(
-            checkFn,
-            bot,
-            'windowUpdate',
-            checkFn,
-            `Expected item "${itemName}" not found in inventory`
-        );
+        if (this.isNot) {
+            await this.waitAbit(500);
+            if (checkFn()) {
+                throw new Error(`Expected inventory NOT to contain item "${itemName}", but it was found`);
+            }
+            return;
+        }
+
+        await waitFor(checkFn, bot, 'windowUpdate', checkFn, `Expected item "${itemName}" not found`);
     }
 }
-
 export function expect<T>(target: T): RunnerMatchers<T> {
     return new RunnerMatchers(target);
 }
