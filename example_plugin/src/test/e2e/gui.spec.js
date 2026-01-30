@@ -15,3 +15,8 @@ test('admin can interact with gui', async ({ player, server }) => {
   // 4. Assertion: Check for the callback message
   await expect(player).toHaveReceivedMessage('You clicked on item');
 });
+
+test('help displays message', async ({ player, server }) => {
+  await player.chat('/help');
+  await expect(player).toHaveReceivedMessage('Help');
+});

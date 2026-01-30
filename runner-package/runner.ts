@@ -1,11 +1,12 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import mineflayer, { Bot } from 'mineflayer';
-import { readdir } from 'fs/promises';
+import { readdir, writeFile, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { ItemWrapper, GuiWrapper, createPlayerExtensions } from './lib/wrappers.js';
 import { Matchers } from "./lib/expect.js";
+import * as yaml from 'js-yaml';
 
 export { ItemWrapper, GuiWrapper };
 
@@ -31,6 +32,7 @@ interface EventEmitterLike {
 const testRegistry: TestCase[] = [];
 let currentPlayer: Bot | null = null;
 let messageBuffer: string[] = [];
+const activeBots: Bot[] = [];
 
 export function test(name: string, fn: (context: TestContext) => Promise<void>): void {
     testRegistry.push({ name, fn });
@@ -150,6 +152,33 @@ export class PlayerWrapper {
     }
 }
 
+async function configureBukkitSettings(serverDir: string): Promise<void> {
+    const bukkitYmlPath = join(serverDir, 'bukkit.yml');
+    
+    try {
+        let bukkitConfig: Record<string, unknown>;
+        
+        if (existsSync(bukkitYmlPath)) {
+            const content = await readFile(bukkitYmlPath, 'utf-8');
+            bukkitConfig = yaml.load(content) as Record<string, unknown>;
+        } else {
+            bukkitConfig = {};
+        }
+        
+        if (!bukkitConfig.settings) {
+            bukkitConfig.settings = {};
+        }
+        
+        (bukkitConfig.settings as Record<string, unknown>)['connection-throttle'] = 0;
+        
+        const updatedContent = yaml.dump(bukkitConfig);
+        await writeFile(bukkitYmlPath, updatedContent, 'utf-8');
+        console.log('✓ Set connection-throttle to 0 in bukkit.yml');
+    } catch (error) {
+        console.warn(`Warning: Could not configure bukkit.yml: ${(error as Error).message}`);
+    }
+}
+
 async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams): Promise<void> {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -202,6 +231,8 @@ export async function runTestSession(): Promise<void> {
     }
 
     console.log('\nStarting Paper server...');
+
+    await configureBukkitSettings(serverDir);
 
     const jvmArgsString = process.env.JVM_ARGS || '-Xmx2G -Dcom.mojang.eula.agree=true';
     const jvmArgs = jvmArgsString.split(' ').filter(arg => arg.trim() !== '');
@@ -285,6 +316,7 @@ export async function runTestSession(): Promise<void> {
                 });
 
                 currentPlayer = bot;
+                activeBots.push(bot);
 
                 await new Promise<void>((resolve, reject) => {
                     const timeout = setTimeout(() => {
@@ -352,16 +384,32 @@ export async function runTestSession(): Promise<void> {
                     console.log(`    FAILED: ${(error as Error).message}\n`);
                     throw error;
                 } finally {
+                    bot.removeAllListeners('error');
+                    bot.removeAllListeners('end');
                     bot.quit();
                     currentPlayer = null;
-                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    const index = activeBots.indexOf(bot);
+                    if (index > -1) activeBots.splice(index, 1);
                 }
             }
         }
 
         console.log('\nAll tests passed!');
     } finally {
-        console.log('\nStopping server...');
+        console.log('\nCleaning up active bots...');
+        for (const bot of activeBots) {
+            try {
+                bot.quit();
+            } catch (err) {
+                // Ignore errors during cleanup
+            }
+        }
+        activeBots.length = 0;
+        
+        // Wait for bots to disconnect
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('Stopping server...');
         serverProcess.kill();
         await new Promise(resolve => setTimeout(resolve, 2000));
     }
