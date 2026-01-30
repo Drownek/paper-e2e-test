@@ -219,12 +219,20 @@ async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams)
     });
 }
 
+interface TestResult {
+    file: string;
+    testName: string;
+    passed: boolean;
+    error?: string;
+}
+
 export async function runTestSession(): Promise<void> {
     const serverJar = process.env.SERVER_JAR;
     const serverDir = process.env.SERVER_DIR;
     const javaPath = process.env.JAVA_PATH;
     const testFileFilter = process.env.TEST_FILES;
     const testNameFilter = process.env.TEST_NAMES;
+    const testResults: TestResult[] = [];
 
     if (!serverJar || !serverDir) {
         throw new Error('SERVER_JAR, JAVA_PATH and SERVER_DIR environment variables must be set');
@@ -380,9 +388,11 @@ export async function runTestSession(): Promise<void> {
 
                     await testCase.fn({ player, server });
                     console.log(`    PASSED\n`);
+                    testResults.push({ file, testName: testCase.name, passed: true });
                 } catch (error) {
-                    console.log(`    FAILED: ${(error as Error).message}\n`);
-                    throw error;
+                    const errorMsg = (error as Error).message;
+                    console.log(`    FAILED: ${errorMsg}\n`);
+                    testResults.push({ file, testName: testCase.name, passed: false, error: errorMsg });
                 } finally {
                     bot.removeAllListeners('error');
                     bot.removeAllListeners('end');
@@ -394,7 +404,28 @@ export async function runTestSession(): Promise<void> {
             }
         }
 
-        console.log('\nAll tests passed!');
+        console.log('\n========================================');
+        console.log('Test Summary');
+        console.log('========================================');
+        
+        const passed = testResults.filter(r => r.passed);
+        const failed = testResults.filter(r => !r.passed);
+        
+        console.log(`Total: ${testResults.length}`);
+        console.log(`Passed: ${passed.length}`);
+        console.log(`Failed: ${failed.length}`);
+        
+        if (failed.length > 0) {
+            console.log('\nFailed Tests:');
+            failed.forEach(result => {
+                console.log(`  ✗ ${result.file} > ${result.testName}`);
+                console.log(`    ${result.error}`);
+            });
+            console.log('');
+            throw new Error(`${failed.length} test(s) failed`);
+        } else {
+            console.log('\nAll tests passed!');
+        }
     } finally {
         console.log('\nCleaning up active bots...');
         for (const bot of activeBots) {
