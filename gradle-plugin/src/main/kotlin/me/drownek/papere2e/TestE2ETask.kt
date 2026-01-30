@@ -51,6 +51,9 @@ abstract class TestE2ETask : DefaultTask() {
     @get:Optional
     abstract val testNames: Property<String>
 
+    @get:Input
+    abstract val pluginName: Property<String>
+
     @get:Nested
     @get:Optional
     abstract val javaLauncher: Property<JavaLauncher>

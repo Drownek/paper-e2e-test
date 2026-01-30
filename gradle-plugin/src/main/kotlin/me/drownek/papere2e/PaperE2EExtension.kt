@@ -47,4 +47,18 @@ abstract class PaperE2EExtension(project: Project) {
      * When true, adds -Dcom.mojang.eula.agree=true to JVM args.
      */
     val acceptEula: Property<Boolean> = project.objects.property(Boolean::class.java).convention(true)
+
+    /**
+     * The name of the plugin folder in plugins/ directory.
+     * Defaults to project.name if not specified.
+     * Used to determine which plugin data folder to clean before tests.
+     */
+    val pluginName: Property<String> = project.objects.property(String::class.java).convention(project.name)
+
+    /**
+     * Whether to clean plugin data before each test run.
+     * When true, deletes the plugin folder in run/plugins/ before starting tests.
+     * This ensures tests run with a fresh state.
+     */
+    val cleanPluginData: Property<Boolean> = project.objects.property(Boolean::class.java).convention(true)
 }
