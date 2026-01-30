@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { ItemWrapper, GuiWrapper, createPlayerExtensions } from './lib/wrappers.js';
 import { Matchers } from "./lib/expect.js";
 import * as yaml from 'js-yaml';
+import { randomUUID } from "node:crypto";
 
 export { ItemWrapper, GuiWrapper };
 
@@ -140,7 +141,7 @@ export class PlayerWrapper {
         this.bot = bot;
         this.inventory = bot.inventory;
         this.username = bot.username;
-        
+
         const extensions = createPlayerExtensions(bot);
         this.waitForGui = extensions.waitForGui.bind(this);
     }
@@ -154,23 +155,23 @@ export class PlayerWrapper {
 
 async function configureBukkitSettings(serverDir: string): Promise<void> {
     const bukkitYmlPath = join(serverDir, 'bukkit.yml');
-    
+
     try {
         let bukkitConfig: Record<string, unknown>;
-        
+
         if (existsSync(bukkitYmlPath)) {
             const content = await readFile(bukkitYmlPath, 'utf-8');
             bukkitConfig = yaml.load(content) as Record<string, unknown>;
         } else {
             bukkitConfig = {};
         }
-        
+
         if (!bukkitConfig.settings) {
             bukkitConfig.settings = {};
         }
-        
+
         (bukkitConfig.settings as Record<string, unknown>)['connection-throttle'] = 0;
-        
+
         const updatedContent = yaml.dump(bukkitConfig);
         await writeFile(bukkitYmlPath, updatedContent, 'utf-8');
         console.log('✓ Set connection-throttle to 0 in bukkit.yml');
@@ -259,9 +260,9 @@ export async function runTestSession(): Promise<void> {
         // Check if TypeScript was compiled (dist directory exists with spec files)
         const distDir = join(process.cwd(), 'dist');
         const hasCompiledTests = existsSync(distDir);
-        
+
         let testFiles: string[] = [];
-        
+
         if (hasCompiledTests) {
             // Look for compiled .spec.js files in dist directory
             const distFiles = (await readdir(distDir))
@@ -269,7 +270,7 @@ export async function runTestSession(): Promise<void> {
                 .map(file => join('dist', file));
             testFiles.push(...distFiles);
         }
-        
+
         // Also look for .spec.js files in the root (for pure JavaScript tests)
         const rootFiles = (await readdir(process.cwd()))
             .filter(file => file.endsWith('.spec.js') && !file.startsWith('dist'));
@@ -279,7 +280,7 @@ export async function runTestSession(): Promise<void> {
         if (testFileFilter) {
             const patterns = testFileFilter.split(',').map(p => p.trim());
             console.log(`Filtering test files with patterns: ${JSON.stringify(patterns)}\n`);
-            testFiles = testFiles.filter(file => 
+            testFiles = testFiles.filter(file =>
                 patterns.some(pattern => {
                     const fileName = file.replace(/^dist[/\\]/, '').replace(/\.spec\.js$/, '');
                     const matches = fileName.includes(pattern) || file.includes(pattern);
@@ -312,7 +313,8 @@ export async function runTestSession(): Promise<void> {
 
                 messageBuffer.length = 0;
 
-                const botUsername = `TestBot_${Math.floor(Math.random() * 1000)}`;
+                const uniqueId = randomUUID().split('-')[0];
+                const botUsername = `Test_${uniqueId}`;
                 console.log(`[Bot] Creating bot: ${botUsername}`);
 
                 const bot = mineflayer.createBot({
@@ -407,14 +409,14 @@ export async function runTestSession(): Promise<void> {
         console.log('\n========================================');
         console.log('Test Summary');
         console.log('========================================');
-        
+
         const passed = testResults.filter(r => r.passed);
         const failed = testResults.filter(r => !r.passed);
-        
+
         console.log(`Total: ${testResults.length}`);
         console.log(`Passed: ${passed.length}`);
         console.log(`Failed: ${failed.length}`);
-        
+
         if (failed.length > 0) {
             console.log('\nFailed Tests:');
             failed.forEach(result => {
@@ -436,10 +438,10 @@ export async function runTestSession(): Promise<void> {
             }
         }
         activeBots.length = 0;
-        
+
         // Wait for bots to disconnect
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         console.log('Stopping server...');
         serverProcess.kill();
         await new Promise(resolve => setTimeout(resolve, 2000));
