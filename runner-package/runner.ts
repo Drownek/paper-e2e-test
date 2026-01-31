@@ -8,6 +8,10 @@ import { ItemWrapper, GuiWrapper, createPlayerExtensions } from './lib/wrappers.
 import { Matchers } from "./lib/expect.js";
 import * as yaml from 'js-yaml';
 import { randomUUID } from "node:crypto";
+import { install as installSourceMapSupport } from 'source-map-support';
+
+// Enable source map support for accurate TypeScript stack traces
+installSourceMapSupport();
 
 export { ItemWrapper, GuiWrapper };
 
@@ -28,6 +32,52 @@ interface TestCase {
 interface EventEmitterLike {
     on(event: string, listener: (...args: unknown[]) => void): void;
     removeListener(event: string, listener: (...args: unknown[]) => void): void;
+}
+
+function extractLineNumberFromStack(stack: string | undefined, testFile: string): { line: number; column: number } | null {
+    if (!stack) return null;
+    
+    // Convert test file path to various possible formats in stack trace
+    const normalizedTestFile = testFile.replace(/\\/g, '/').replace(/^dist\//, '').replace(/\.spec\.js$/, '.spec.ts');
+    
+    // Look for stack trace lines that reference the test file
+    // The test file reference might be anywhere in the stack, not just at the top
+    const lines = stack.split('\n');
+
+    for (const line of lines) {
+        // Match file:///path:line:col or (file:///path:line:col)
+        const fileUrlMatch = line.match(/file:\/\/\/(.+?):(\d+):(\d+)/);
+        if (fileUrlMatch) {
+            const filePath = fileUrlMatch[1].replace(/\\/g, '/');
+
+            // Check if this path contains our test file name
+            if (filePath.includes(normalizedTestFile) || 
+                filePath.endsWith(normalizedTestFile) ||
+                filePath.includes(testFile.replace(/\\/g, '/'))) {
+                return {
+                    line: parseInt(fileUrlMatch[2], 10),
+                    column: parseInt(fileUrlMatch[3], 10)
+                };
+            }
+        }
+        
+        // Also try matching regular path format: at path:line:col
+        const pathMatch = line.match(/at\s+(?:.*?\s+\()?(.+?):(\d+):(\d+)\)?/);
+        if (pathMatch) {
+            const filePath = pathMatch[1].replace(/\\/g, '/');
+
+            if (filePath.includes(normalizedTestFile) || 
+                filePath.endsWith(normalizedTestFile) ||
+                filePath.includes(testFile.replace(/\\/g, '/'))) {
+                return {
+                    line: parseInt(pathMatch[2], 10),
+                    column: parseInt(pathMatch[3], 10)
+                };
+            }
+        }
+    }
+    
+    return null;
 }
 
 const testRegistry: TestCase[] = [];
@@ -76,8 +126,15 @@ function waitFor<T>(
 }
 
 class RunnerMatchers<T = unknown> extends Matchers<T> {
+    private callSite: string;
+    
     constructor(actual: T, isNot: boolean = false) {
         super(actual, isNot);
+        
+        // Capture the call site where expect() was called
+        const err = new Error();
+        Error.captureStackTrace(err, RunnerMatchers);
+        this.callSite = err.stack || '';
     }
 
     private async waitAbit(ms: number = 500) {
@@ -93,22 +150,31 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
             await this.waitAbit(500);
             const found = messageBuffer.find(isMatch);
             if (found) {
-                throw new Error(`Expected NOT to receive message matching "${expectedMessage}", but received: "${found}"`);
+                const error = new Error(`Expected NOT to receive message matching "${expectedMessage}", but received: "${found}"`);
+                error.stack = this.callSite;
+                throw error;
             }
             return;
         }
 
-        const checkFn = (): string | undefined => messageBuffer.find(isMatch);
-        await waitFor(
-            checkFn,
-            bot,
-            'message',
-            (jsonMsg: unknown): string | undefined => {
-                const msgStr = String(jsonMsg);
-                return isMatch(msgStr) ? msgStr : undefined;
-            },
-            `Expected message "${expectedMessage}" not received`
-        );
+        try {
+            const checkFn = (): string | undefined => messageBuffer.find(isMatch);
+            await waitFor(
+                checkFn,
+                bot,
+                'message',
+                (jsonMsg: unknown): string | undefined => {
+                    const msgStr = String(jsonMsg);
+                    return isMatch(msgStr) ? msgStr : undefined;
+                },
+                `Expected message "${expectedMessage}" not received`
+            );
+        } catch (error) {
+            // Replace the error stack with our captured call site
+            const newError = new Error((error as Error).message);
+            newError.stack = this.callSite;
+            throw newError;
+        }
     }
 
     async toContainItem(this: RunnerMatchers<PlayerWrapper>, itemName: string): Promise<void> {
@@ -119,12 +185,21 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         if (this.isNot) {
             await this.waitAbit(500);
             if (checkFn()) {
-                throw new Error(`Expected inventory NOT to contain item "${itemName}", but it was found`);
+                const error = new Error(`Expected inventory NOT to contain item "${itemName}", but it was found`);
+                error.stack = this.callSite;
+                throw error;
             }
             return;
         }
 
-        await waitFor(checkFn, bot, 'windowUpdate', checkFn, `Expected item "${itemName}" not found`);
+        try {
+            await waitFor(checkFn, bot, 'windowUpdate', checkFn, `Expected item "${itemName}" not found`);
+        } catch (error) {
+            // Replace the error stack with our captured call site
+            const newError = new Error((error as Error).message);
+            newError.stack = this.callSite;
+            throw newError;
+        }
     }
 }
 export function expect<T>(target: T): RunnerMatchers<T> {
@@ -225,6 +300,9 @@ interface TestResult {
     testName: string;
     passed: boolean;
     error?: string;
+    stack?: string;
+    lineNumber?: number;
+    columnNumber?: number;
 }
 
 export async function runTestSession(): Promise<void> {
@@ -393,8 +471,20 @@ export async function runTestSession(): Promise<void> {
                     testResults.push({ file, testName: testCase.name, passed: true });
                 } catch (error) {
                     const errorMsg = (error as Error).message;
+                    const stack = (error as Error).stack;
+                    const location = extractLineNumberFromStack(stack, file);
+
                     console.log(`    FAILED: ${errorMsg}\n`);
-                    testResults.push({ file, testName: testCase.name, passed: false, error: errorMsg });
+
+                    testResults.push({ 
+                        file, 
+                        testName: testCase.name, 
+                        passed: false, 
+                        error: errorMsg, 
+                        stack,
+                        lineNumber: location?.line,
+                        columnNumber: location?.column
+                    });
                 } finally {
                     bot.removeAllListeners('error');
                     bot.removeAllListeners('end');
@@ -419,10 +509,18 @@ export async function runTestSession(): Promise<void> {
 
         if (failed.length > 0) {
             console.log('\nFailed Tests:');
-            failed.forEach(result => {
-                console.log(`  ✗ ${result.file} > ${result.testName}`);
+            for (const result of failed) {
+                const filePath = result.file.replace(/^dist[/\\]/, '').replace(/\.spec\.js$/, '.spec.ts');
+                const absolutePath = join(process.cwd(), filePath);
+                
+                const lineNumber = result.lineNumber;
+                const columnNumber = result.columnNumber || 1;
+                
+                const fileUrl = pathToFileURL(absolutePath).href + (lineNumber ? `:${lineNumber}:${columnNumber}` : '');
+                console.log(`  ✗ ${result.testName}`);
                 console.log(`    ${result.error}`);
-            });
+                console.log(`    ${fileUrl}`);
+            }
             console.log('');
             throw new Error(`${failed.length} test(s) failed`);
         } else {
