@@ -2,8 +2,8 @@ import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import mineflayer, { Bot } from 'mineflayer';
 import { readdir, writeFile, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
+import { join } from 'path';
+import { pathToFileURL } from 'url';
 import { ItemWrapper, GuiWrapper, createPlayerExtensions } from './lib/wrappers.js';
 import { Matchers } from "./lib/expect.js";
 import * as yaml from 'js-yaml';
@@ -51,7 +51,7 @@ function extractLineNumberFromStack(stack: string | undefined, testFile: string)
             const filePath = fileUrlMatch[1].replace(/\\/g, '/');
 
             // Check if this path contains our test file name
-            if (filePath.includes(normalizedTestFile) || 
+            if (filePath.includes(normalizedTestFile) ||
                 filePath.endsWith(normalizedTestFile) ||
                 filePath.includes(testFile.replace(/\\/g, '/'))) {
                 return {
@@ -60,13 +60,13 @@ function extractLineNumberFromStack(stack: string | undefined, testFile: string)
                 };
             }
         }
-        
+
         // Also try matching regular path format: at path:line:col
         const pathMatch = line.match(/at\s+(?:.*?\s+\()?(.+?):(\d+):(\d+)\)?/);
         if (pathMatch) {
             const filePath = pathMatch[1].replace(/\\/g, '/');
 
-            if (filePath.includes(normalizedTestFile) || 
+            if (filePath.includes(normalizedTestFile) ||
                 filePath.endsWith(normalizedTestFile) ||
                 filePath.includes(testFile.replace(/\\/g, '/'))) {
                 return {
@@ -76,7 +76,7 @@ function extractLineNumberFromStack(stack: string | undefined, testFile: string)
             }
         }
     }
-    
+
     return null;
 }
 
@@ -126,11 +126,11 @@ function waitFor<T>(
 }
 
 class RunnerMatchers<T = unknown> extends Matchers<T> {
-    private callSite: string;
-    
+    private readonly callSite: string;
+
     constructor(actual: T, isNot: boolean = false) {
         super(actual, isNot);
-        
+
         // Capture the call site where expect() was called
         const err = new Error();
         Error.captureStackTrace(err, RunnerMatchers);
@@ -476,11 +476,11 @@ export async function runTestSession(): Promise<void> {
 
                     console.log(`    FAILED: ${errorMsg}\n`);
 
-                    testResults.push({ 
-                        file, 
-                        testName: testCase.name, 
-                        passed: false, 
-                        error: errorMsg, 
+                    testResults.push({
+                        file,
+                        testName: testCase.name,
+                        passed: false,
+                        error: errorMsg,
                         stack,
                         lineNumber: location?.line,
                         columnNumber: location?.column
@@ -512,10 +512,10 @@ export async function runTestSession(): Promise<void> {
             for (const result of failed) {
                 const filePath = result.file.replace(/^dist[/\\]/, '').replace(/\.spec\.js$/, '.spec.ts');
                 const absolutePath = join(process.cwd(), filePath);
-                
+
                 const lineNumber = result.lineNumber;
                 const columnNumber = result.columnNumber || 1;
-                
+
                 const fileUrl = pathToFileURL(absolutePath).href + (lineNumber ? `:${lineNumber}:${columnNumber}` : '');
                 console.log(`  ✗ ${result.testName}`);
                 console.log(`    ${result.error}`);
