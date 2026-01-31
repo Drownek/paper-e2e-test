@@ -9,6 +9,7 @@ import { Matchers } from "./lib/expect.js";
 import * as yaml from 'js-yaml';
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
+import { captureCallSite, extractLineNumberFromStack } from './lib/stack-trace.js';
 
 // Enable source map support for accurate TypeScript stack traces
 installSourceMapSupport();
@@ -34,51 +35,6 @@ interface EventEmitterLike {
     removeListener(event: string, listener: (...args: unknown[]) => void): void;
 }
 
-function extractLineNumberFromStack(stack: string | undefined, testFile: string): { line: number; column: number } | null {
-    if (!stack) return null;
-    
-    // Convert test file path to various possible formats in stack trace
-    const normalizedTestFile = testFile.replace(/\\/g, '/').replace(/^dist\//, '').replace(/\.spec\.js$/, '.spec.ts');
-    
-    // Look for stack trace lines that reference the test file
-    // The test file reference might be anywhere in the stack, not just at the top
-    const lines = stack.split('\n');
-
-    for (const line of lines) {
-        // Match file:///path:line:col or (file:///path:line:col)
-        const fileUrlMatch = line.match(/file:\/\/\/(.+?):(\d+):(\d+)/);
-        if (fileUrlMatch) {
-            const filePath = fileUrlMatch[1].replace(/\\/g, '/');
-
-            // Check if this path contains our test file name
-            if (filePath.includes(normalizedTestFile) ||
-                filePath.endsWith(normalizedTestFile) ||
-                filePath.includes(testFile.replace(/\\/g, '/'))) {
-                return {
-                    line: parseInt(fileUrlMatch[2], 10),
-                    column: parseInt(fileUrlMatch[3], 10)
-                };
-            }
-        }
-
-        // Also try matching regular path format: at path:line:col
-        const pathMatch = line.match(/at\s+(?:.*?\s+\()?(.+?):(\d+):(\d+)\)?/);
-        if (pathMatch) {
-            const filePath = pathMatch[1].replace(/\\/g, '/');
-
-            if (filePath.includes(normalizedTestFile) ||
-                filePath.endsWith(normalizedTestFile) ||
-                filePath.includes(testFile.replace(/\\/g, '/'))) {
-                return {
-                    line: parseInt(pathMatch[2], 10),
-                    column: parseInt(pathMatch[3], 10)
-                };
-            }
-        }
-    }
-
-    return null;
-}
 
 const testRegistry: TestCase[] = [];
 let currentPlayer: Bot | null = null;
@@ -131,10 +87,7 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
     constructor(actual: T, isNot: boolean = false) {
         super(actual, isNot);
 
-        // Capture the call site where expect() was called
-        const err = new Error();
-        Error.captureStackTrace(err, RunnerMatchers);
-        this.callSite = err.stack || '';
+        this.callSite = captureCallSite(RunnerMatchers);
     }
 
     private async waitAbit(ms: number = 500) {
