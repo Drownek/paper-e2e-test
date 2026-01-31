@@ -152,15 +152,6 @@ abstract class TestE2ETask : DefaultTask() {
             return
         }
 
-        // Copy fixtures from testsDir/fixtures to server run directory
-        val fixturesSourceDir = File(userTestsDirectory, "fixtures")
-        if (fixturesSourceDir.exists() && fixturesSourceDir.isDirectory) {
-            logger.lifecycle("Copying fixtures from ${fixturesSourceDir.absolutePath} to ${runDirectory.absolutePath}")
-            copyDirectory(fixturesSourceDir, runDirectory)
-        } else {
-            logger.lifecycle("No fixtures directory found at ${fixturesSourceDir.absolutePath}")
-        }
-
         // Install dependencies if needed
         if (!File(userTestsDirectory, "node_modules").exists()) {
             logger.lifecycle("Installing Node.js dependencies...")
@@ -337,19 +328,6 @@ abstract class TestE2ETask : DefaultTask() {
 
         if (exitCode != 0) {
             throw RuntimeException("Command '${command.joinToString(" ")}' failed with exit code: $exitCode")
-        }
-    }
-
-    private fun copyDirectory(source: File, destination: File) {
-        source.walkTopDown().forEach { file ->
-            val targetFile = File(destination, file.relativeTo(source).path)
-            if (file.isDirectory) {
-                targetFile.mkdirs()
-            } else {
-                targetFile.parentFile?.mkdirs()
-                Files.copy(file.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                logger.lifecycle("Copied: ${file.name} -> ${targetFile.absolutePath}")
-            }
         }
     }
 }
