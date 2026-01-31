@@ -321,7 +321,7 @@ export async function runTestSession(): Promise<void> {
 
     await configureBukkitSettings(serverDir);
 
-    const jvmArgsString = process.env.JVM_ARGS || '-Xmx2G -Dcom.mojang.eula.agree=true';
+    const jvmArgsString = process.env.JVM_ARGS || '';
     const jvmArgs = jvmArgsString.split(' ').filter(arg => arg.trim() !== '');
 
     console.log(`JVM Arguments: ${jvmArgs.join(' ')}`);
