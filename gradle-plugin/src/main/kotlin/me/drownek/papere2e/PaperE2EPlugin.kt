@@ -16,23 +16,44 @@ class PaperE2EPlugin : Plugin<Project> {
 
             doLast {
                 val runDir = extension.runDir.get().asFile
-                val shouldClean = extension.cleanPluginData.get()
+                val excludePatterns = extension.cleanExcludePatterns.get()
 
-                // 1. Always wipe World Data (Safe, these regenerate)
-                project.delete(runDir.resolve("world"))
-                project.delete(runDir.resolve("world_nether"))
-                project.delete(runDir.resolve("world_the_end"))
-                project.delete(runDir.resolve("usercache.json"))
-                project.logger.lifecycle("🧹 [E2E] Cleaned world data and user cache")
+                if (!runDir.exists()) {
+                    project.logger.lifecycle("🧹 [E2E] Run directory doesn't exist yet, nothing to clean")
+                    return@doLast
+                }
 
-                // 2. Wipe Plugin Data (Configurable)
-                if (shouldClean) {
-                    val pluginFolder = runDir.resolve("plugins")
-                    if (pluginFolder.exists()) {
-                        project.logger.lifecycle("🧹 [E2E] Wiping plugins folder: ${pluginFolder.path}")
-                        project.delete(pluginFolder)
+                project.logger.lifecycle("🧹 [E2E] Cleaning run directory, excluding: ${excludePatterns.joinToString(", ")}")
+
+                // Get all files and directories in the run folder
+                val allEntries = runDir.listFiles() ?: emptyArray()
+
+                // Separate entries into deleted and kept
+                val deletedFiles = mutableListOf<String>()
+                val keptFiles = mutableListOf<String>()
+
+                // Delete everything except the excluded patterns
+                allEntries.forEach { entry ->
+                    val shouldExclude = excludePatterns.any { pattern ->
+                        entry.name == pattern
+                    }
+
+                    if (!shouldExclude) {
+                        deletedFiles.add(entry.name)
+                        project.delete(entry)
+                    } else {
+                        keptFiles.add(entry.name)
                     }
                 }
+
+                if (deletedFiles.isNotEmpty()) {
+                    project.logger.lifecycle("🧹 [E2E] Deleted: ${deletedFiles.joinToString(", ")}")
+                }
+                if (keptFiles.isNotEmpty()) {
+                    project.logger.lifecycle("🧹 [E2E] Preserved: ${keptFiles.joinToString(", ")}")
+                }
+
+                project.logger.lifecycle("🧹 [E2E] Cleaned run directory")
             }
         }
 

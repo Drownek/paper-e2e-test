@@ -52,4 +52,17 @@ abstract class PaperE2EExtension(project: Project) {
      * This ensures tests run with a fresh state.
      */
     val cleanPluginData: Property<Boolean> = project.objects.property(Boolean::class.java).convention(true)
+
+    /**
+     * List of files/folders to exclude from deletion during cleanE2E.
+     * By default, excludes server.jar, cache, and libraries folders.
+     * These paths are relative to the run directory.
+     */
+    val cleanExcludePatterns: ListProperty<String> = project.objects.listProperty(String::class.java).convention(
+        listOf(
+            "server.jar",
+            "cache",
+            "libraries"
+        )
+    )
 }
