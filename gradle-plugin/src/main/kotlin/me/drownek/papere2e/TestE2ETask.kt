@@ -14,6 +14,8 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import org.yaml.snakeyaml.Yaml
+import org.yaml.snakeyaml.DumperOptions
 
 abstract class TestE2ETask : DefaultTask() {
 
@@ -106,6 +108,9 @@ abstract class TestE2ETask : DefaultTask() {
             logger.lifecycle("Creating server.properties with online-mode=false and connection-throttle=0")
             Files.write(serverProperties.toPath(), listOf("online-mode=false", "connection-throttle=0"))
         }
+
+        // Configure bukkit.yml settings
+        configureBukkitSettings(runDirectory)
 
         // Create plugins directory if it doesn't exist
         val pluginsDir = File(runDirectory, "plugins")
@@ -285,6 +290,39 @@ abstract class TestE2ETask : DefaultTask() {
             
         } catch (e: Exception) {
             throw RuntimeException("Failed to download Paper server: ${e.message}", e)
+        }
+    }
+
+    private fun configureBukkitSettings(serverDirectory: File) {
+        val bukkitYmlFile = File(serverDirectory, "bukkit.yml")
+
+        try {
+            val dumperOptions = DumperOptions().apply {
+                defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
+                isPrettyFlow = true
+            }
+            val yaml = Yaml(dumperOptions)
+
+            val bukkitConfig: MutableMap<String, Any> = if (bukkitYmlFile.exists()) {
+                val content = bukkitYmlFile.readText()
+                yaml.load(content) ?: mutableMapOf()
+            } else {
+                mutableMapOf()
+            }
+
+            // Ensure settings section exists
+            @Suppress("UNCHECKED_CAST")
+            val settings = bukkitConfig.getOrPut("settings") { mutableMapOf<String, Any>() } as MutableMap<String, Any>
+
+            // Set connection-throttle to 0
+            settings["connection-throttle"] = 0
+
+            // Write back to file
+            val updatedContent = yaml.dump(bukkitConfig)
+            bukkitYmlFile.writeText(updatedContent)
+            logger.lifecycle("Set connection-throttle to 0 in bukkit.yml")
+        } catch (e: Exception) {
+            logger.warn("Warning: Could not configure bukkit.yml: ${e.message}")
         }
     }
 

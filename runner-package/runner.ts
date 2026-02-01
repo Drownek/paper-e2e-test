@@ -6,7 +6,6 @@ import { join } from 'path';
 import { pathToFileURL } from 'url';
 import { ItemWrapper, GuiWrapper, createPlayerExtensions } from './lib/wrappers.js';
 import { Matchers } from "./lib/expect.js";
-import * as yaml from 'js-yaml';
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
 import { captureCallSite, extractLineNumberFromStack } from './lib/stack-trace.js';
@@ -181,33 +180,6 @@ export class PlayerWrapper {
     }
 }
 
-async function configureBukkitSettings(serverDir: string): Promise<void> {
-    const bukkitYmlPath = join(serverDir, 'bukkit.yml');
-
-    try {
-        let bukkitConfig: Record<string, unknown>;
-
-        if (existsSync(bukkitYmlPath)) {
-            const content = await readFile(bukkitYmlPath, 'utf-8');
-            bukkitConfig = yaml.load(content) as Record<string, unknown>;
-        } else {
-            bukkitConfig = {};
-        }
-
-        if (!bukkitConfig.settings) {
-            bukkitConfig.settings = {};
-        }
-
-        (bukkitConfig.settings as Record<string, unknown>)['connection-throttle'] = 0;
-
-        const updatedContent = yaml.dump(bukkitConfig);
-        await writeFile(bukkitYmlPath, updatedContent, 'utf-8');
-        console.log('✓ Set connection-throttle to 0 in bukkit.yml');
-    } catch (error) {
-        console.warn(`Warning: Could not configure bukkit.yml: ${(error as Error).message}`);
-    }
-}
-
 async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams): Promise<void> {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -271,8 +243,6 @@ export async function runTestSession(): Promise<void> {
     }
 
     console.log('\nStarting Paper server...');
-
-    await configureBukkitSettings(serverDir);
 
     const jvmArgsString = process.env.JVM_ARGS || '';
     const jvmArgs = jvmArgsString.split(' ').filter(arg => arg.trim() !== '');
