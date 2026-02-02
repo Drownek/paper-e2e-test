@@ -445,26 +445,66 @@ export async function runTestSession(): Promise<void> {
                 console.log(`    ${fileUrl}`);
             }
             console.log('');
+            
+            setTimeout(() => {
+                process.exit(1);
+            }, 1000).unref();
+            
             throw new Error(`${failed.length} test(s) failed`);
         } else {
             console.log('\nAll tests passed!');
         }
     } finally {
-        console.log('\nCleaning up active bots...');
-        for (const bot of activeBots) {
-            try {
-                bot.quit();
-            } catch (err) {
-                // Ignore errors during cleanup
-            }
-        }
+        await Promise.all(activeBots.map(bot => {
+            return new Promise<void>((resolve) => {
+                const timeout = setTimeout(() => {
+                    console.log(`[WARNING] Bot ${bot.username} cleanup timeout, forcing end`);
+                    resolve();
+                }, 2000);
+
+                bot.once('end', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                });
+
+                try {
+                    bot.quit();
+                } catch (err) {
+                    clearTimeout(timeout);
+                    resolve();
+                }
+            });
+        }));
         activeBots.length = 0;
 
-        // Wait for bots to disconnect
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        serverProcess.stdin.write('stop\n');
 
-        console.log('Stopping server...');
-        serverProcess.kill();
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait for the server to exit gracefully
+        await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+                console.log('[WARNING] Server did not stop gracefully, forcing shutdown...');
+                serverProcess.kill();
+                resolve();
+            }, 30000); // 30 second timeout
+
+            serverProcess.once('exit', (code) => {
+                clearTimeout(timeout);
+                if (code !== 0) {
+                    console.log(`[WARNING] Server exited with code: ${code}`);
+                }
+                resolve();
+            });
+        });
+
+        // Clean up all listeners and streams
+        serverProcess.removeAllListeners();
+        serverProcess.stdin.end();
+        serverProcess.stdout.destroy();
+        serverProcess.stderr.destroy();
+
+        // Give the event loop a moment to drain, then force exit
+        setTimeout(() => {
+            process.exit(0);
+        }, 1000).unref();
     }
 }
