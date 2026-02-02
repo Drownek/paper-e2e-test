@@ -1,7 +1,12 @@
 import {expect, test} from '@drownek/paper-e2e-runner';
 
+test('command permission works', async ({ player, server }) => {
+  await player.chat('/example gui-settings');
+  await expect(player).toHaveReceivedMessage('You don\'t have permission to execute this command! (example) (MISSING_PERMISSIONS)');
+});
+
 test('admin can interact with gui', async ({ player, server }) => {
-  // 1. Setup: OP the bot so it can run the command (if needed, though this command seems permissionless or basic)
+  // 1. OP: to grant ability to execute command
   await server.execute(`op ${player.bot.username}`);
 
   // 2. Action: Open the GUI and wait for it
@@ -9,9 +14,13 @@ test('admin can interact with gui', async ({ player, server }) => {
   const gui = await player.waitForGui('guiSettings');
 
   // 3. Interact: Click the item named "guiItemInfo"
-  // Note: The item name in config is "guiItemInfo". Mineflayer usually sees the display name.
   await gui.clickItem(item => item.getDisplayName().includes('guiItemInfo'));
 
   // 4. Assertion: Check for the callback message
   await expect(player).toHaveReceivedMessage('You clicked on item');
+});
+
+test('help displays message', async ({ player, server }) => {
+  await player.chat('/help');
+  await expect(player).toHaveReceivedMessage('Help');
 });
