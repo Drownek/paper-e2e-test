@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "io.github.drownek"
-version = "1.0.4-beta.0"
+version = "1.0.4"
 
 repositories {
     mavenCentral()
