@@ -409,9 +409,27 @@ export async function runTestSession(): Promise<void> {
                         columnNumber: location?.column
                     });
                 } finally {
-                    bot.removeAllListeners('error');
-                    bot.removeAllListeners('end');
-                    bot.quit();
+                    bot.removeAllListeners();
+                    
+                    await new Promise<void>((resolve) => {
+                        const timeout = setTimeout(() => {
+                            console.log(`[WARNING] Bot ${bot.username} disconnect timeout, continuing anyway`);
+                            resolve();
+                        }, 2000);
+
+                        bot.once('end', () => {
+                            clearTimeout(timeout);
+                            resolve();
+                        });
+
+                        try {
+                            bot.quit();
+                        } catch (err) {
+                            clearTimeout(timeout);
+                            resolve();
+                        }
+                    });
+                    
                     currentPlayer = null;
                     const index = activeBots.indexOf(bot);
                     if (index > -1) activeBots.splice(index, 1);
