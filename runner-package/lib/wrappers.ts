@@ -136,7 +136,12 @@ export class GuiWrapper {
 
 export function createPlayerExtensions(bot: Bot) {
     return {
-        async waitForGui(titleMatcher: string | RegExp | ((title: string) => boolean), timeout: number = 5000): Promise<GuiWrapper> {
+        async waitForGui(
+            titleMatcher: string | RegExp | ((title: string) => boolean),
+            options: { timeout?: number; settleTime?: number } = {}
+        ): Promise<GuiWrapper> {
+            const { timeout = 5000, settleTime = 150 } = options;
+
             const matches = (actual: string): boolean => {
                 const parsed = ItemWrapper.parseChat(actual);
                 if (titleMatcher instanceof RegExp) {
@@ -148,29 +153,49 @@ export function createPlayerExtensions(bot: Bot) {
                 }
             };
 
-            // If its currently open, return it immediately
-            if (bot.currentWindow && matches(bot.currentWindow.title)) {
-                const currentWindow = bot.currentWindow as Window;
-                console.log(`[Player] GUI was already open: "${ItemWrapper.parseChat(currentWindow.title)}"`);
-                return new Promise(resolve => resolve(new GuiWrapper(bot, currentWindow)));
-            }
-
             return new Promise((resolve, reject) => {
-                const timeoutId = setTimeout(() => {
-                    bot.removeListener('windowOpen', handler);
-                    reject(new Error(`[Player] Timeout waiting for GUI matching: ${titleMatcher} (${timeout}ms)`));
+                let latestWindow: Window | null = null;
+                let settleTimer: NodeJS.Timeout | null = null;
+
+                const deadline = setTimeout(() => {
+                    cleanup();
+                    if (latestWindow) {
+                        console.log(`[Player] GUI resolved on timeout with: "${ItemWrapper.parseChat(latestWindow.title)}"`);
+                        resolve(new GuiWrapper(bot, latestWindow));
+                    } else {
+                        reject(new Error(`[Player] Timeout waiting for GUI matching: ${titleMatcher} (${timeout}ms)`));
+                    }
                 }, timeout);
+
+                const settle = () => {
+                    if (settleTimer) clearTimeout(settleTimer);
+                    settleTimer = setTimeout(() => {
+                        cleanup();
+                        console.log(`[Player] GUI settled: "${ItemWrapper.parseChat(latestWindow!.title)}"`);
+                        resolve(new GuiWrapper(bot, latestWindow!));
+                    }, settleTime);
+                };
 
                 const handler = (window: unknown) => {
                     const win = window as Window;
                     if (matches(win.title)) {
-                        clearTimeout(timeoutId);
-                        bot.removeListener('windowOpen', handler);
-
-                        console.log(`[Player] GUI Opened: "${ItemWrapper.parseChat(win.title)}"`);
-                        resolve(new GuiWrapper(bot, win));
+                        latestWindow = win;
+                        settle();
                     }
                 };
+
+                const cleanup = () => {
+                    clearTimeout(deadline);
+                    if (settleTimer) clearTimeout(settleTimer);
+                    bot.removeListener('windowOpen', handler);
+                };
+
+                // Check if GUI is already open
+                if (bot.currentWindow && matches(bot.currentWindow.title)) {
+                    latestWindow = bot.currentWindow as Window;
+                    console.log(`[Player] GUI already open: "${ItemWrapper.parseChat(latestWindow.title)}"`);
+                    settle();
+                }
 
                 bot.on('windowOpen', handler);
             });

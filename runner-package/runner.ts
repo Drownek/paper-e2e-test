@@ -162,7 +162,8 @@ export class PlayerWrapper {
     bot: Bot;
     inventory: Bot['inventory'];
     username: string;
-    waitForGui: (title: string | RegExp | ((title: string) => boolean), timeout?: number) => Promise<GuiWrapper>;
+    waitForGui: (titleMatcher: string | RegExp | ((title: string) => boolean), options?: { timeout?: number; settleTime?: number }) => Promise<GuiWrapper>;
+    private serverWrapper?: ServerWrapper;
 
     constructor(bot: Bot) {
         this.bot = bot;
@@ -173,10 +174,49 @@ export class PlayerWrapper {
         this.waitForGui = extensions.waitForGui.bind(this);
     }
 
+    setServerWrapper(server: ServerWrapper): void {
+        this.serverWrapper = server;
+    }
+
     async chat(message: string): Promise<void> {
         console.log(`[Bot] Chatting: ${message}`);
         this.bot.chat(message);
         await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    async makeOp(): Promise<void> {
+        if (!this.serverWrapper) {
+            throw new Error('ServerWrapper not set. This should not happen in test context.');
+        }
+        await this.serverWrapper.execute(`minecraft:op ${this.username}`);
+    }
+
+    async deOp(): Promise<void> {
+        if (!this.serverWrapper) {
+            throw new Error('ServerWrapper not set. This should not happen in test context.');
+        }
+        await this.serverWrapper.execute(`minecraft:deop ${this.username}`);
+    }
+
+    async setGameMode(mode: 'survival' | 'creative' | 'adventure' | 'spectator'): Promise<void> {
+        if (!this.serverWrapper) {
+            throw new Error('ServerWrapper not set. This should not happen in test context.');
+        }
+        await this.serverWrapper.execute(`minecraft:gamemode ${mode} ${this.username}`);
+    }
+
+    async teleport(x: number, y: number, z: number): Promise<void> {
+        if (!this.serverWrapper) {
+            throw new Error('ServerWrapper not set. This should not happen in test context.');
+        }
+        await this.serverWrapper.execute(`minecraft:tp ${this.username} ${x} ${y} ${z}`);
+    }
+
+    async giveItem(item: string, count: number = 1): Promise<void> {
+        if (!this.serverWrapper) {
+            throw new Error('ServerWrapper not set. This should not happen in test context.');
+        }
+        await this.serverWrapper.execute(`minecraft:give ${this.username} ${item} ${count}`);
     }
 }
 
@@ -378,7 +418,6 @@ export async function runTestSession(): Promise<void> {
                 });
 
                 try {
-                    const player = new PlayerWrapper(bot);
                     const server: ServerWrapper = {
                         execute: async (cmd: string) => {
                             console.log(`[Server] Executing: ${cmd}`);
@@ -388,6 +427,9 @@ export async function runTestSession(): Promise<void> {
                             await new Promise(r => setTimeout(r, 500));
                         }
                     };
+
+                    const player = new PlayerWrapper(bot);
+                    player.setServerWrapper(server);
 
                     await testCase.fn({ player, server });
                     console.log(`    PASSED\n`);
