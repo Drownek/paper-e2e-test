@@ -162,7 +162,7 @@ export class PlayerWrapper {
     bot: Bot;
     inventory: Bot['inventory'];
     username: string;
-    waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<void>;
+    waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<GuiWrapper>;
     waitForGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<ItemWrapper>;
     clickGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<void>;
     private serverWrapper?: ServerWrapper;

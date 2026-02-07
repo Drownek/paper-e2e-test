@@ -233,12 +233,12 @@ export function createPlayerExtensions(bot: Bot) {
         async waitForGui(
             guiMatcher: (gui: GuiWrapper) => boolean,
             options: { timeout?: number } = {}
-        ): Promise<void> {
+        ): Promise<GuiWrapper> {
             const { timeout = 5000 } = options;
 
-            const matches = (window: Window): boolean => {
+            const tryMatch = (window: Window): GuiWrapper | null => {
                 const gui = new GuiWrapper(bot, window);
-                return guiMatcher(gui);
+                return guiMatcher(gui) ? gui : null;
             };
 
             return new Promise((resolve, reject) => {
@@ -249,12 +249,12 @@ export function createPlayerExtensions(bot: Bot) {
 
                 const handler = (window: unknown) => {
                     const win = window as Window;
-                    // Wait for next tick to allow mineflayer to process window items packet
                     setImmediate(() => {
-                        if (matches(win)) {
+                        const matched = tryMatch(win);
+                        if (matched) {
                             cleanup();
-                            console.log(`[Player] GUI matched: "${ItemWrapper.parseChat(win.title)}"`);
-                            resolve();
+                            console.log(`[Player] GUI matched: "${matched.title}"`);
+                            resolve(matched);
                         }
                     });
                 };
@@ -266,14 +266,13 @@ export function createPlayerExtensions(bot: Bot) {
 
                 if (bot.currentWindow) {
                     const currentWin = bot.currentWindow as Window;
-                    // Wait for next tick to ensure slots are populated
                     setImmediate(() => {
-                        if (matches(currentWin)) {
+                        const matched = tryMatch(currentWin);
+                        if (matched) {
                             cleanup();
-                            console.log(`[Player] GUI already open: "${ItemWrapper.parseChat(currentWin.title)}"`);
-                            resolve();
+                            console.log(`[Player] GUI already open: "${matched.title}"`);
+                            resolve(matched);
                         } else {
-                            // If doesn't match after waiting, listen for windowOpen
                             bot.on('windowOpen', handler);
                         }
                     });
