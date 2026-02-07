@@ -1,6 +1,6 @@
 {
   "name": "@drownek/paper-e2e-runner",
-  "version": "1.0.6-beta.9",
+  "version": "1.0.6-beta.11",
   "description": "End-to-end testing framework for Paper/Spigot Minecraft plugins",
   "type": "module",
   "main": "dist/runner.js",

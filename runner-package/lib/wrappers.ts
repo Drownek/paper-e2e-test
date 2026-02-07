@@ -236,49 +236,48 @@ export function createPlayerExtensions(bot: Bot) {
         ): Promise<GuiWrapper> {
             const { timeout = 5000 } = options;
 
-            const tryMatch = (window: Window): GuiWrapper | null => {
-                const gui = new GuiWrapper(bot, window);
-                return guiMatcher(gui) ? gui : null;
-            };
-
             return new Promise((resolve, reject) => {
+                let settled = false;
+
+                const tryMatch = (): GuiWrapper | null => {
+                    if (!bot.currentWindow) return null;
+                    const gui = new GuiWrapper(bot, bot.currentWindow as Window);
+                    return guiMatcher(gui) ? gui : null;
+                };
+
+                const settle = (gui: GuiWrapper) => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    console.log(`[Player] GUI matched: "${gui.title}"`);
+                    resolve(gui);
+                };
+
+                const attempt = () => {
+                    if (settled) return;
+                    const matched = tryMatch();
+                    if (matched) settle(matched);
+                };
+
                 const deadline = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
                     cleanup();
                     reject(new Error(`[Player] Timeout waiting for GUI matching predicate (${timeout}ms)`));
                 }, timeout);
 
-                const handler = (window: unknown) => {
-                    const win = window as Window;
-                    setImmediate(() => {
-                        const matched = tryMatch(win);
-                        if (matched) {
-                            cleanup();
-                            console.log(`[Player] GUI matched: "${matched.title}"`);
-                            resolve(matched);
-                        }
-                    });
+                const onWindowOpen = () => {
+                    setImmediate(attempt);
                 };
 
                 const cleanup = () => {
                     clearTimeout(deadline);
-                    bot.removeListener('windowOpen', handler);
+                    bot.removeListener('windowOpen', onWindowOpen);
                 };
 
-                if (bot.currentWindow) {
-                    const currentWin = bot.currentWindow as Window;
-                    setImmediate(() => {
-                        const matched = tryMatch(currentWin);
-                        if (matched) {
-                            cleanup();
-                            console.log(`[Player] GUI already open: "${matched.title}"`);
-                            resolve(matched);
-                        } else {
-                            bot.on('windowOpen', handler);
-                        }
-                    });
-                } else {
-                    bot.on('windowOpen', handler);
-                }
+                bot.on('windowOpen', onWindowOpen);
+
+                setImmediate(attempt);
             });
         }
     };
