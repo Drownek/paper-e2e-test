@@ -17,7 +17,7 @@ interface RawItem {
     };
 }
 
-interface Window {
+export interface Window {
     title: string;
     type: string | number;
     slots: (RawItem | null)[];
@@ -100,8 +100,8 @@ export class GuiWrapper {
             .map(item => new ItemWrapper(item));
     }
 
-    getTitle(): string {
-        return this.title;
+    hasItem(predicate: (item: ItemWrapper) => boolean): boolean {
+        return this.items.some(predicate);
     }
 
     findItem(predicate: (item: ItemWrapper) => boolean): ItemWrapper | undefined {
@@ -110,10 +110,6 @@ export class GuiWrapper {
 
     findAllItems(predicate: (item: ItemWrapper) => boolean): ItemWrapper[] {
         return this.items.filter(predicate);
-    }
-
-    getItems(): ItemWrapper[] {
-        return this.items;
     }
 
     async clickItem(predicate: (item: ItemWrapper) => boolean): Promise<void> {
@@ -136,68 +132,154 @@ export class GuiWrapper {
 
 export function createPlayerExtensions(bot: Bot) {
     return {
-        async waitForGui(
-            titleMatcher: string | RegExp | ((title: string) => boolean),
-            options: { timeout?: number; settleTime?: number } = {}
-        ): Promise<GuiWrapper> {
-            const { timeout = 5000, settleTime = 150 } = options;
+        async waitForGuiItem(
+            itemMatcher: (item: ItemWrapper) => boolean,
+            options: { timeout?: number; pollingRate?: number } = {}
+        ): Promise<ItemWrapper> {
+            const { timeout = 5000, pollingRate = 100 } = options;
+            const startTime = Date.now();
 
-            const matches = (actual: string): boolean => {
-                const parsed = ItemWrapper.parseChat(actual);
-                if (titleMatcher instanceof RegExp) {
-                    return titleMatcher.test(parsed);
-                } else if (titleMatcher instanceof Function) {
-                    return titleMatcher(parsed);
-                } else {
-                    return parsed.includes(titleMatcher);
-                }
+            return new Promise((resolve, reject) => {
+                const checkForItem = () => {
+                    const elapsed = Date.now() - startTime;
+                    
+                    if (elapsed >= timeout) {
+                        clearInterval(pollInterval);
+                        reject(new Error(`[Player] Timeout waiting for GUI item (${timeout}ms)`));
+                        return;
+                    }
+
+                    // Check if there's a current window open
+                    if (!bot.currentWindow) {
+                        return; // Continue polling
+                    }
+
+                    const window = bot.currentWindow as Window;
+                    const items = window.slots
+                        .filter((item): item is RawItem => item != null)
+                        .map(item => new ItemWrapper(item));
+
+                    const matchedItem = items.find(itemMatcher);
+                    
+                    if (matchedItem) {
+                        clearInterval(pollInterval);
+                        console.log(`[Player] Found GUI item: ${matchedItem.getDisplayName()} at slot ${matchedItem.slot}`);
+                        resolve(matchedItem);
+                    }
+                };
+
+                // Start polling
+                const pollInterval = setInterval(checkForItem, pollingRate);
+                
+                // Initial check
+                checkForItem();
+            });
+        },
+
+        async clickGuiItem(
+            itemMatcher: (item: ItemWrapper) => boolean,
+            options: { timeout?: number; pollingRate?: number } = {}
+        ): Promise<void> {
+            const { timeout = 5000, pollingRate = 100 } = options;
+            const startTime = Date.now();
+
+            return new Promise((resolve, reject) => {
+                const checkForItem = async () => {
+                    const elapsed = Date.now() - startTime;
+                    
+                    if (elapsed >= timeout) {
+                        clearInterval(pollInterval);
+                        reject(new Error(`[Player] Timeout waiting for GUI item to click (${timeout}ms)`));
+                        return;
+                    }
+
+                    if (!bot.currentWindow) {
+                        return;
+                    }
+
+                    const window = bot.currentWindow as Window;
+                    const items = window.slots
+                        .filter((item): item is RawItem => item != null)
+                        .map(item => new ItemWrapper(item));
+
+                    const matchedItem = items.find(itemMatcher);
+                    
+                    if (matchedItem) {
+                        clearInterval(pollInterval);
+                        
+                        const lore = matchedItem.getLore();
+                        console.log(`[Player] Clicking GUI item: ${matchedItem.getDisplayName()}`);
+                        console.log(`  Material: ${matchedItem.name}`);
+                        console.log(`  Slot: ${matchedItem.slot}`);
+                        if (lore.length > 0) {
+                            console.log(`  Lore: ${lore.join(' | ')}`);
+                        }
+                        
+                        try {
+                            await bot.clickWindow(matchedItem.slot, 0, 0);
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                    }
+                };
+
+                const pollInterval = setInterval(checkForItem, pollingRate);
+                
+                checkForItem();
+            });
+        },
+
+        async waitForGui(
+            guiMatcher: (gui: GuiWrapper) => boolean,
+            options: { timeout?: number } = {}
+        ): Promise<void> {
+            const { timeout = 5000 } = options;
+
+            const matches = (window: Window): boolean => {
+                const gui = new GuiWrapper(bot, window);
+                return guiMatcher(gui);
             };
 
             return new Promise((resolve, reject) => {
-                let latestWindow: Window | null = null;
-                let settleTimer: NodeJS.Timeout | null = null;
-
                 const deadline = setTimeout(() => {
                     cleanup();
-                    if (latestWindow) {
-                        console.log(`[Player] GUI resolved on timeout with: "${ItemWrapper.parseChat(latestWindow.title)}"`);
-                        resolve(new GuiWrapper(bot, latestWindow));
-                    } else {
-                        reject(new Error(`[Player] Timeout waiting for GUI matching: ${titleMatcher} (${timeout}ms)`));
-                    }
+                    reject(new Error(`[Player] Timeout waiting for GUI matching predicate (${timeout}ms)`));
                 }, timeout);
-
-                const settle = () => {
-                    if (settleTimer) clearTimeout(settleTimer);
-                    settleTimer = setTimeout(() => {
-                        cleanup();
-                        console.log(`[Player] GUI settled: "${ItemWrapper.parseChat(latestWindow!.title)}"`);
-                        resolve(new GuiWrapper(bot, latestWindow!));
-                    }, settleTime);
-                };
 
                 const handler = (window: unknown) => {
                     const win = window as Window;
-                    if (matches(win.title)) {
-                        latestWindow = win;
-                        settle();
-                    }
+                    // Wait for next tick to allow mineflayer to process window items packet
+                    setImmediate(() => {
+                        if (matches(win)) {
+                            cleanup();
+                            console.log(`[Player] GUI matched: "${ItemWrapper.parseChat(win.title)}"`);
+                            resolve();
+                        }
+                    });
                 };
 
                 const cleanup = () => {
                     clearTimeout(deadline);
-                    if (settleTimer) clearTimeout(settleTimer);
                     bot.removeListener('windowOpen', handler);
                 };
 
-                // Check if GUI is already open
-                if (bot.currentWindow && matches(bot.currentWindow.title)) {
-                    latestWindow = bot.currentWindow as Window;
-                    console.log(`[Player] GUI already open: "${ItemWrapper.parseChat(latestWindow.title)}"`);
-                    settle();
+                if (bot.currentWindow) {
+                    const currentWin = bot.currentWindow as Window;
+                    // Wait for next tick to ensure slots are populated
+                    setImmediate(() => {
+                        if (matches(currentWin)) {
+                            cleanup();
+                            console.log(`[Player] GUI already open: "${ItemWrapper.parseChat(currentWin.title)}"`);
+                            resolve();
+                        } else {
+                            // If doesn't match after waiting, listen for windowOpen
+                            bot.on('windowOpen', handler);
+                        }
+                    });
+                } else {
+                    bot.on('windowOpen', handler);
                 }
-
-                bot.on('windowOpen', handler);
             });
         }
     };

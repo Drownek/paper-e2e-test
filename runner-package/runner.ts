@@ -4,7 +4,7 @@ import { readdir, writeFile, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
-import { ItemWrapper, GuiWrapper, createPlayerExtensions } from './lib/wrappers.js';
+import {ItemWrapper, GuiWrapper, createPlayerExtensions, Window} from './lib/wrappers.js';
 import { Matchers } from "./lib/expect.js";
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
@@ -162,7 +162,9 @@ export class PlayerWrapper {
     bot: Bot;
     inventory: Bot['inventory'];
     username: string;
-    waitForGui: (titleMatcher: string | RegExp | ((title: string) => boolean), options?: { timeout?: number; settleTime?: number }) => Promise<GuiWrapper>;
+    waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<void>;
+    waitForGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<ItemWrapper>;
+    clickGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<void>;
     private serverWrapper?: ServerWrapper;
 
     constructor(bot: Bot) {
@@ -172,10 +174,17 @@ export class PlayerWrapper {
 
         const extensions = createPlayerExtensions(bot);
         this.waitForGui = extensions.waitForGui.bind(this);
+        this.waitForGuiItem = extensions.waitForGuiItem.bind(this);
+        this.clickGuiItem = extensions.clickGuiItem.bind(this);
     }
 
     setServerWrapper(server: ServerWrapper): void {
         this.serverWrapper = server;
+    }
+
+    getCurrentGui(): GuiWrapper | null {
+        let currentWindow = this.bot.currentWindow;
+        return currentWindow ? new GuiWrapper(this.bot, currentWindow as Window) : null;
     }
 
     async chat(message: string): Promise<void> {
