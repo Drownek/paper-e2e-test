@@ -23,6 +23,134 @@ export interface Window {
     slots: (RawItem | null)[];
 }
 
+/**
+ * A locator for GUI items.
+ * Does NOT resolve the item immediately - it's a query that will be re-evaluated each time it's used.
+ */
+export class GuiItemLocator {
+    private readonly gui: LiveGuiHandle;
+    private readonly predicate: (item: ItemWrapper) => boolean;
+
+    constructor(gui: LiveGuiHandle, predicate: (item: ItemWrapper) => boolean) {
+        this.gui = gui;
+        this.predicate = predicate;
+    }
+
+    /**
+     * Attempts to find the item in the current GUI state.
+     * Returns undefined if not found.
+     */
+    private _tryFind(): ItemWrapper | undefined {
+        const currentGui = this.gui._getCurrentGuiSnapshot();
+        if (!currentGui) return undefined;
+        return currentGui.findItem(this.predicate);
+    }
+
+    /**
+     * Gets the lore text of the located item.
+     * Re-queries the GUI each time it's called.
+     */
+    loreText(): string {
+        const item = this._tryFind();
+        if (!item) return '';
+        return item.getLore().join(' ');
+    }
+
+    /**
+     * Gets the display name of the located item.
+     * Re-queries the GUI each time it's called.
+     */
+    displayName(): string {
+        const item = this._tryFind();
+        if (!item) return '';
+        return item.getDisplayName();
+    }
+
+    /**
+     * Clicks the located item.
+     * Retries until the item exists or times out.
+     */
+    async click(options: { timeout?: number } = {}): Promise<void> {
+        const { timeout = 5000 } = options;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < timeout) {
+            const currentGui = this.gui._getCurrentGuiSnapshot();
+            if (currentGui) {
+                const item = currentGui.findItem(this.predicate);
+                if (item) {
+                    await currentGui.clickItem(this.predicate);
+                    return;
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        throw new Error(`[GuiItemLocator] Timeout waiting for item to exist (${timeout}ms)`);
+    }
+
+    /**
+     * Internal method used by matchers to get the predicate.
+     */
+    _getPredicate(): (item: ItemWrapper) => boolean {
+        return this.predicate;
+    }
+
+    /**
+     * Internal method used by matchers to get the GUI handle.
+     */
+    _getGuiHandle(): LiveGuiHandle {
+        return this.gui;
+    }
+}
+
+/**
+ * A live handle to the player's GUI.
+ * This is NOT a snapshot - it always reflects the player's CURRENT open GUI.
+ */
+export class LiveGuiHandle {
+    private readonly bot: Bot;
+    private readonly titleMatcher: (title: string) => boolean;
+
+    constructor(bot: Bot, titleMatcher: (title: string) => boolean) {
+        this.bot = bot;
+        this.titleMatcher = titleMatcher;
+    }
+
+    /**
+     * Creates a locator for items matching the predicate.
+     * The locator does NOT resolve immediately - it's a query that will be re-evaluated each time it's used.
+     */
+    locator(predicate: (item: ItemWrapper) => boolean): GuiItemLocator {
+        return new GuiItemLocator(this, predicate);
+    }
+
+    /**
+     * Gets the current GUI title, or undefined if no GUI is open or doesn't match.
+     */
+    get title(): string | undefined {
+        const gui = this._getCurrentGuiSnapshot();
+        return gui?.title;
+    }
+
+    /**
+     * Internal method to get a snapshot of the current GUI state.
+     * Returns undefined if no GUI is open or if it doesn't match the title matcher.
+     */
+    _getCurrentGuiSnapshot(): GuiWrapper | undefined {
+        if (!this.bot.currentWindow) return undefined;
+        const gui = new GuiWrapper(this.bot, this.bot.currentWindow as Window);
+        return this.titleMatcher(gui.title) ? gui : undefined;
+    }
+
+    /**
+     * Internal method to get the bot instance.
+     */
+    _getBot(): Bot {
+        return this.bot;
+    }
+}
+
 export class ItemWrapper {
     raw: RawItem;
     name: string;
@@ -264,6 +392,71 @@ export function createPlayerExtensions(bot: Bot) {
                     settled = true;
                     cleanup();
                     reject(new Error(`[Player] Timeout waiting for GUI matching predicate (${timeout}ms)`));
+                }, timeout);
+
+                const onWindowOpen = () => {
+                    setImmediate(attempt);
+                };
+
+                const cleanup = () => {
+                    clearTimeout(deadline);
+                    bot.removeListener('windowOpen', onWindowOpen);
+                };
+
+                bot.on('windowOpen', onWindowOpen);
+
+                setImmediate(attempt);
+            });
+        },
+
+        /**
+         * Get a live handle to a GUI matching the title.
+         * It waits ONLY until a GUI with matching title exists.
+         * It does NOT wait for items, slots, or lore.
+         * 
+         * The returned handle is LIVE - it always reflects the player's CURRENT open GUI.
+         * 
+         * @param options.title - String or RegExp to match against GUI title
+         * @param options.timeout - Maximum time to wait for GUI to appear (default: 5000ms)
+         */
+        async gui(
+            options: { title: string | RegExp; timeout?: number }
+        ): Promise<LiveGuiHandle> {
+            const { title, timeout = 5000 } = options;
+            
+            // Create title matcher function
+            const titleMatcher = typeof title === 'string'
+                ? (guiTitle: string) => guiTitle.includes(title)
+                : (guiTitle: string) => title.test(guiTitle);
+
+            return new Promise((resolve, reject) => {
+                let settled = false;
+
+                const tryMatch = (): boolean => {
+                    if (!bot.currentWindow) return false;
+                    const gui = new GuiWrapper(bot, bot.currentWindow as Window);
+                    return titleMatcher(gui.title);
+                };
+
+                const settle = () => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    const handle = new LiveGuiHandle(bot, titleMatcher);
+                    console.log(`[Player] GUI matched: "${handle.title}"`);
+                    resolve(handle);
+                };
+
+                const attempt = () => {
+                    if (settled) return;
+                    if (tryMatch()) settle();
+                };
+
+                const deadline = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    cleanup();
+                    reject(new Error(`[Player] Timeout waiting for GUI with title matching pattern (${timeout}ms)`));
                 }, timeout);
 
                 const onWindowOpen = () => {
