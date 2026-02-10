@@ -47,13 +47,6 @@ abstract class PaperE2EExtension(project: Project) {
     val acceptEula: Property<Boolean> = project.objects.property(Boolean::class.java).convention(true)
 
     /**
-     * Whether to clean plugin data before each test run.
-     * When true, deletes the plugins folder before starting tests.
-     * This ensures tests run with a fresh state.
-     */
-    val cleanPluginData: Property<Boolean> = project.objects.property(Boolean::class.java).convention(true)
-
-    /**
      * List of files/folders to exclude from deletion during cleanE2E.
      * By default, excludes server.jar, cache, and libraries folders.
      * These paths are relative to the run directory.

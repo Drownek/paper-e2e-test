@@ -21,7 +21,7 @@ plugins {
     id("io.github.drownek.paper-e2e") version "1.1.0"
 }
 
-paperE2E {
+e2e {
     minecraftVersion.set("1.19.4")
     runDir.set("run")
     testsDir.set(file("src/test/e2e"))
