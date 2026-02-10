@@ -7,14 +7,14 @@ test('command permission works', async ({ player, server }) => {
 
 test('admin can interact with gui', async ({ player, server }) => {
   // 1. OP: to grant ability to execute command
-  await server.execute(`op ${player.bot.username}`);
+  await player.makeOp();
 
   // 2. Action: Open the GUI and wait for it
   await player.chat('/example gui-settings');
-  const gui = await player.waitForGui('guiSettings');
+  const gui = await player.gui({ title: 'guiSettings' });
 
   // 3. Interact: Click the item named "guiItemInfo"
-  await gui.clickItem(item => item.getDisplayName().includes('guiItemInfo'));
+  await gui.locator(item => item.getDisplayName().includes('guiItemInfo')).click();
 
   // 4. Assertion: Check for the callback message
   await expect(player).toHaveReceivedMessage('You clicked on item');

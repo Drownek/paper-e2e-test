@@ -4,7 +4,7 @@ import { readdir, writeFile, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
-import {ItemWrapper, GuiWrapper, createPlayerExtensions, Window} from './lib/wrappers.js';
+import { ItemWrapper, GuiWrapper, createPlayerExtensions, Window, LiveGuiHandle, GuiItemLocator } from './lib/wrappers.js';
 import { Matchers } from "./lib/expect.js";
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
@@ -153,6 +153,45 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
             throw newError;
         }
     }
+
+    async toHaveLore(this: RunnerMatchers<GuiItemLocator>, expectedLore: string, options: { timeout?: number; pollingRate?: number } = {}): Promise<void> {
+        const { timeout = 5000, pollingRate = 100 } = options;
+        const locator = this.actual;
+        const startTime = Date.now();
+
+        const checkFn = (): boolean => {
+            const loreText = locator.loreText();
+            return loreText.includes(expectedLore);
+        };
+
+        if (this.isNot) {
+            // For negative assertions, poll until the lore no longer matches or timeout
+            while (Date.now() - startTime < timeout) {
+                if (!checkFn()) {
+                    return; // Success: lore doesn't match
+                }
+                await new Promise(resolve => setTimeout(resolve, pollingRate));
+            }
+            const error = new Error(`Expected locator NOT to have lore containing "${expectedLore}", but it does`);
+            error.stack = this.callSite;
+            throw error;
+        }
+
+        // For positive assertions, poll until the lore matches or timeout
+        while (Date.now() - startTime < timeout) {
+            if (checkFn()) {
+                return; // Success: lore matches
+            }
+            await new Promise(resolve => setTimeout(resolve, pollingRate));
+        }
+
+        const currentLore = locator.loreText();
+        const error = new Error(
+            `Expected locator to have lore containing "${expectedLore}", but got: "${currentLore}"`
+        );
+        error.stack = this.callSite;
+        throw error;
+    }
 }
 export function expect<T>(target: T): RunnerMatchers<T> {
     return new RunnerMatchers(target);
@@ -162,9 +201,48 @@ export class PlayerWrapper {
     bot: Bot;
     inventory: Bot['inventory'];
     username: string;
-    waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<void>;
+    
+    /**
+     * @deprecated Use `player.gui({ title })` instead. This method will be removed in a future version.
+     * 
+     * @example
+     * // Old (deprecated):
+     * const gui = await player.waitForGui(g => g.title.includes('Activity'));
+     * 
+     * // New (recommended):
+     * const gui = await player.gui({ title: /Activity/ });
+     */
+    waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<GuiWrapper>;
+    
+    /**
+     * @deprecated Use `gui.locator(predicate)` with expectations instead. This method will be removed in a future version.
+     * 
+     * @example
+     * // Old (deprecated):
+     * const item = await player.waitForGuiItem(i => i.name.includes('clock'));
+     * 
+     * // New (recommended):
+     * const gui = await player.gui({ title: /Activity/ });
+     * const item = gui.locator(i => i.name.includes('clock'));
+     * await expect(item).toHaveLore('some text');
+     */
     waitForGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<ItemWrapper>;
+    
+    /**
+     * @deprecated Use `gui.locator(predicate).click()` instead. This method will be removed in a future version.
+     * 
+     * @example
+     * // Old (deprecated):
+     * await player.clickGuiItem(i => i.name.includes('clock'));
+     * 
+     * // New (recommended):
+     * const gui = await player.gui({ title: /Activity/ });
+     * const item = gui.locator(i => i.name.includes('clock'));
+     * await item.click();
+     */
     clickGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<void>;
+    
+    gui: (options: { title: string | RegExp; timeout?: number }) => Promise<LiveGuiHandle>;
     private serverWrapper?: ServerWrapper;
 
     constructor(bot: Bot) {
@@ -176,6 +254,7 @@ export class PlayerWrapper {
         this.waitForGui = extensions.waitForGui.bind(this);
         this.waitForGuiItem = extensions.waitForGuiItem.bind(this);
         this.clickGuiItem = extensions.clickGuiItem.bind(this);
+        this.gui = extensions.gui.bind(this);
     }
 
     setServerWrapper(server: ServerWrapper): void {
