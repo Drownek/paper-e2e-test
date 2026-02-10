@@ -201,9 +201,47 @@ export class PlayerWrapper {
     bot: Bot;
     inventory: Bot['inventory'];
     username: string;
+    
+    /**
+     * @deprecated Use `player.gui({ title })` instead. This method will be removed in a future version.
+     * 
+     * @example
+     * // Old (deprecated):
+     * const gui = await player.waitForGui(g => g.title.includes('Activity'));
+     * 
+     * // New (recommended):
+     * const gui = await player.gui({ title: /Activity/ });
+     */
     waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<GuiWrapper>;
+    
+    /**
+     * @deprecated Use `gui.locator(predicate)` with expectations instead. This method will be removed in a future version.
+     * 
+     * @example
+     * // Old (deprecated):
+     * const item = await player.waitForGuiItem(i => i.name.includes('clock'));
+     * 
+     * // New (recommended):
+     * const gui = await player.gui({ title: /Activity/ });
+     * const item = gui.locator(i => i.name.includes('clock'));
+     * await expect(item).toHaveLore('some text');
+     */
     waitForGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<ItemWrapper>;
+    
+    /**
+     * @deprecated Use `gui.locator(predicate).click()` instead. This method will be removed in a future version.
+     * 
+     * @example
+     * // Old (deprecated):
+     * await player.clickGuiItem(i => i.name.includes('clock'));
+     * 
+     * // New (recommended):
+     * const gui = await player.gui({ title: /Activity/ });
+     * const item = gui.locator(i => i.name.includes('clock'));
+     * await item.click();
+     */
     clickGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<void>;
+    
     gui: (options: { title: string | RegExp; timeout?: number }) => Promise<LiveGuiHandle>;
     private serverWrapper?: ServerWrapper;
 

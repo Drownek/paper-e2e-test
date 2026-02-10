@@ -4,11 +4,13 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 
 ## Features
 
-- 🚀 Simple setup - start testing in minutes
-- 📝 JavaScript and TypeScript support
-- 🎮 Realistic bot testing with Mineflayer
-- 🔧 Gradle integration - single command to run tests
-- 📦 Automatic Paper server download and management
+* 🚀 **Fast & Simple Setup** – Start testing in minutes with automated server lifecycle management and Paper server downloads.
+* 🎮 **Realistic Bot Testing** – Powered by Mineflayer for authentic player interaction.
+* 🎭 **Playwright-inspired API** – Familiar patterns using live handles and locators for intuitive scripting.
+* 🧪 **Type-Safe** – Native JavaScript and TypeScript support with full type safety.
+* 🔄 **Automatic Retries** – Built-in retry logic to eliminate flaky tests and ensure stability.
+* 📊 **Rich Assertions** – Custom matchers specifically designed for Minecraft mechanics.
+* 🔧 **Gradle Integration** – Run your entire suite with a single command.
 
 ## Quick Start
 
@@ -16,7 +18,7 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 
 ```kotlin
 plugins {
-    id("io.github.drownek.paper-e2e") version "1.0.4"
+    id("io.github.drownek.paper-e2e") version "1.1.0"
 }
 
 paperE2E {
@@ -35,7 +37,7 @@ Create `src/test/e2e/package.json`:
 {
   "type": "module",
   "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.0.4"
+    "@drownek/paper-e2e-runner": "^1.1.0"
   }
 }
 ```
