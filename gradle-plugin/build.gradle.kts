@@ -5,7 +5,8 @@ plugins {
 }
 
 group = "io.github.drownek"
-version = "1.1.0"
+val projectVersion = file("../version.txt").readText().trim()
+version = projectVersion
 
 repositories {
     mavenCentral()
