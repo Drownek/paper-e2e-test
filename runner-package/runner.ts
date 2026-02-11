@@ -450,7 +450,7 @@ export async function runTestSession(): Promise<void> {
                     host: 'localhost',
                     port: 25565,
                     username: botUsername,
-                    version: '1.19.4',
+                    version: process.env.MC_VERSION,
                     auth: 'offline'
                 });
 
