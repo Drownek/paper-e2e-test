@@ -10,6 +10,9 @@ e2e {
     autoDownloadServer.set(true)
     acceptEula.set(true)
     testsDir.set(file("src/test/e2e"))
+    downloadPlugins {
+        url("https://hangarcdn.papermc.io/plugins/HelpChat/PlaceholderAPI/versions/2.11.6/PAPER/PlaceholderAPI-2.11.6.jar")
+    }
 }
 
 group = "me.drownek"

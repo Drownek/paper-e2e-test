@@ -58,4 +58,40 @@ abstract class PaperE2EExtension(project: Project) {
             "libraries"
         )
     )
+
+    /**
+     * URLs of plugins to download before running tests.
+     * These plugins will be placed in the server's plugins directory.
+     */
+    val pluginUrls: ListProperty<String> = project.objects.listProperty(String::class.java).convention(emptyList())
+
+    /**
+     * DSL method for configuring plugin downloads.
+     * Example:
+     * ```
+     * downloadPlugins {
+     *     url("https://example.com/plugin1.jar")
+     *     url("https://example.com/plugin2.jar")
+     * }
+     * ```
+     */
+    fun downloadPlugins(action: PluginDownloadSpec.() -> Unit) {
+        val spec = PluginDownloadSpec()
+        action(spec)
+        pluginUrls.set(spec.urls)
+    }
+
+    /**
+     * Specification for plugin downloads.
+     */
+    class PluginDownloadSpec {
+        internal val urls = mutableListOf<String>()
+
+        /**
+         * Add a plugin URL to download.
+         */
+        fun url(pluginUrl: String) {
+            urls.add(pluginUrl)
+        }
+    }
 }

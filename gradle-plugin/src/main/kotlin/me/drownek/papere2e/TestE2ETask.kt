@@ -14,6 +14,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.time.Duration
 import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.DumperOptions
 
@@ -56,6 +57,9 @@ abstract class TestE2ETask : DefaultTask() {
     @get:Nested
     @get:Optional
     abstract val javaLauncher: Property<JavaLauncher>
+
+    @get:Input
+    abstract val pluginUrls: ListProperty<String>
 
     init {
         group = "verification"
@@ -127,6 +131,19 @@ abstract class TestE2ETask : DefaultTask() {
                 Files.copy(jarFile.toPath(), File(pluginsDir, jarFile.name).toPath(), StandardCopyOption.REPLACE_EXISTING)
             } else {
                 logger.warn("Plugin jar configured but does not exist: $jarFile")
+            }
+        }
+
+        // Download additional plugins from URLs
+        val urls = pluginUrls.get()
+        if (urls.isNotEmpty()) {
+            logger.lifecycle("Downloading ${urls.size} plugin(s)...")
+            val httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(30))
+                .build()
+            urls.forEach { url ->
+                downloadPlugin(httpClient, url, pluginsDir)
             }
         }
 
@@ -290,6 +307,47 @@ abstract class TestE2ETask : DefaultTask() {
             
         } catch (e: Exception) {
             throw RuntimeException("Failed to download Paper server: ${e.message}", e)
+        }
+    }
+
+    private fun downloadPlugin(httpClient: HttpClient, url: String, pluginsDirectory: File) {
+        try {
+            // Extract filename from URL path
+            val uri = URI.create(url)
+            val path = uri.path
+            val fileName = path.substring(path.lastIndexOf('/') + 1)
+
+            if (fileName.isEmpty() || !fileName.endsWith(".jar")) {
+                throw RuntimeException("Invalid plugin URL: $url. The URL path must end with a .jar filename")
+            }
+
+            val destination = File(pluginsDirectory, fileName)
+            if (destination.exists()) {
+                logger.warn("Plugin file already exists and will be overwritten: $fileName")
+            }
+
+            logger.lifecycle("Downloading plugin: $fileName from $url")
+
+            val request = HttpRequest.newBuilder()
+                .uri(uri)
+                .timeout(Duration.ofMinutes(5))
+                .GET()
+                .build()
+
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
+
+            if (response.statusCode() != 200) {
+                throw RuntimeException("Failed to download plugin from $url. Status: ${response.statusCode()}")
+            }
+
+            Files.copy(response.body(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+
+            logger.lifecycle("Plugin downloaded successfully: $fileName")
+
+        } catch (e: RuntimeException) {
+            throw e
+        } catch (e: Exception) {
+            throw RuntimeException("Failed to download plugin from $url: ${e.message}", e)
         }
     }
 
