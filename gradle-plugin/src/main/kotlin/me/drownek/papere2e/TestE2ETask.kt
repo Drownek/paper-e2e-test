@@ -211,7 +211,8 @@ abstract class TestE2ETask : DefaultTask() {
             "SERVER_JAR" to serverJar.trim(),
             "SERVER_DIR" to serverDirectory.trim(),
             "JAVA_PATH" to javaPath,
-            "JVM_ARGS" to jvmArgsString
+            "JVM_ARGS" to jvmArgsString,
+            "MC_VERSION" to mcVersion
         )
 
         if (testFiles.isPresent) {
