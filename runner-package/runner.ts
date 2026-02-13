@@ -370,6 +370,8 @@ export async function runTestSession(): Promise<void> {
         throw new Error('SERVER_JAR, JAVA_PATH and SERVER_DIR environment variables must be set');
     }
 
+    let exitCode = 0;
+
     console.log('\nStarting Paper server...');
 
     const jvmArgsString = process.env.JVM_ARGS || '';
@@ -593,10 +595,8 @@ export async function runTestSession(): Promise<void> {
                 console.log(`    ${fileUrl}`);
             }
             console.log('');
-            
-            setTimeout(() => {
-                process.exit(1);
-            }, 1000).unref();
+
+            exitCode = 1;
             
             throw new Error(`${failed.length} test(s) failed`);
         } else {
@@ -650,9 +650,9 @@ export async function runTestSession(): Promise<void> {
         serverProcess.stdout.destroy();
         serverProcess.stderr.destroy();
 
-        // Give the event loop a moment to drain, then force exit
+        // Safety net
         setTimeout(() => {
-            process.exit(0);
+            process.exit(exitCode);
         }, 1000).unref();
     }
 }
