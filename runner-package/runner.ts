@@ -374,7 +374,7 @@ export async function runTestSession(): Promise<void> {
     const testNameFilter = process.env.TEST_NAMES;
     const testResults: TestResult[] = [];
 
-    if (!serverJar || !serverDir) {
+    if (!serverJar || !serverDir || !javaPath) {
         throw new Error('SERVER_JAR, JAVA_PATH and SERVER_DIR environment variables must be set');
     }
 
