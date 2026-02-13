@@ -328,11 +328,19 @@ async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams)
                 clearTimeout(timeout);
                 console.log('\nServer ready detected\n');
                 serverProcess.stdout.removeListener('data', dataHandler);
+                serverProcess.stderr.removeListener('data', stderrHandler);
                 setTimeout(resolve, 3000);
             }
         };
 
+        const stderrHandler = (data: Buffer): void => {
+            const output = data.toString();
+            outputBuffer += output;
+            console.error(output);
+        };
+
         serverProcess.stdout.on('data', dataHandler);
+        serverProcess.stderr.on('data', stderrHandler);
 
         serverProcess.on('error', (err: Error) => {
             clearTimeout(timeout);
