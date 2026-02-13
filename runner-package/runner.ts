@@ -633,7 +633,14 @@ export async function runTestSession(): Promise<void> {
         }));
         activeBots.length = 0;
 
-        serverProcess.stdin.write('stop\n');
+        // Check if server is still running before attempting to write
+        if (serverProcess.exitCode === null && !serverProcess.killed) {
+            try {
+                serverProcess.stdin.write('stop\n');
+            } catch (err) {
+                console.log('[WARNING] Failed to send stop command to server:', (err as Error).message);
+            }
+        }
 
         // Wait for the server to exit gracefully
         await new Promise<void>((resolve) => {
