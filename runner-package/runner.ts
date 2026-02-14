@@ -89,8 +89,23 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         this.callSite = captureCallSite(RunnerMatchers);
     }
 
-    private async waitAbit(ms: number = 500) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    private async pollForAbsence(
+        checkFn: () => unknown,
+        buildErrorMsg: (foundValue: unknown) => string,
+        timeoutMs: number = 1000,
+        pollingRateMs: number = 50
+    ): Promise<void> {
+        const startTime = Date.now();
+        
+        while (Date.now() - startTime < timeoutMs) {
+            const result = checkFn();
+            if (result !== undefined) {
+                const error = new Error(buildErrorMsg(result));
+                error.stack = this.callSite;
+                throw error;
+            }
+            await new Promise(resolve => setTimeout(resolve, pollingRateMs));
+        }
     }
 
     async toHaveReceivedMessage(this: RunnerMatchers<PlayerWrapper>, expectedMessage: string, strict: boolean = false): Promise<void> {
@@ -99,13 +114,10 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         const isMatch = (msg: string): boolean => strict ? msg === expectedMessage : msg.includes(expectedMessage);
 
         if (this.isNot) {
-            await this.waitAbit(500);
-            const found = messageBuffer.find(isMatch);
-            if (found) {
-                const error = new Error(`Expected NOT to receive message matching "${expectedMessage}", but received: "${found}"`);
-                error.stack = this.callSite;
-                throw error;
-            }
+            await this.pollForAbsence(
+                () => messageBuffer.find(isMatch),
+                (foundMsg) => `Expected NOT to receive message matching "${expectedMessage}", but received: "${foundMsg}"`
+            );
             return;
         }
 
@@ -135,12 +147,13 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         const checkFn = (): boolean => bot.inventory.items().some(item => item.name.includes(itemName));
 
         if (this.isNot) {
-            await this.waitAbit(500);
-            if (checkFn()) {
-                const error = new Error(`Expected inventory NOT to contain item "${itemName}", but it was found`);
-                error.stack = this.callSite;
-                throw error;
-            }
+            await this.pollForAbsence(
+                () => {
+                    const found = bot.inventory.items().find(item => item.name.includes(itemName));
+                    return found ? found.name : undefined;
+                },
+                (foundItemName) => `Expected inventory NOT to contain item "${itemName}", but found: "${foundItemName}"`
+            );
             return;
         }
 
