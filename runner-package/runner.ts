@@ -106,7 +106,7 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         pollingRateMs: number = 50
     ): Promise<void> {
         const startTime = Date.now();
-        
+
         while (Date.now() - startTime < timeoutMs) {
             const result = checkFn();
             if (result !== undefined) {
@@ -118,10 +118,13 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         }
     }
 
-    async toHaveReceivedMessage(this: RunnerMatchers<PlayerWrapper>, expectedMessage: string, strict: boolean = false): Promise<void> {
+    async toHaveReceivedMessage(this: RunnerMatchers<PlayerWrapper>, expectedMessage: string | RegExp, strict: boolean = false): Promise<void> {
         const player = this.actual;
         const bot = player.bot;
-        const isMatch = (msg: string): boolean => strict ? msg === expectedMessage : msg.includes(expectedMessage);
+        const isMatch = (msg: string): boolean => {
+            if (expectedMessage instanceof RegExp) return expectedMessage.test(msg);
+            return strict ? msg === expectedMessage : msg.includes(expectedMessage);
+        };
 
         if (this.isNot) {
             await this.pollForAbsence(
@@ -224,47 +227,47 @@ export class PlayerWrapper {
     bot: Bot;
     inventory: Bot['inventory'];
     username: string;
-    
+
     /**
      * @deprecated Use `player.gui({ title })` instead. This method will be removed in a future version.
-     * 
+     *
      * @example
      * // Old (deprecated):
      * const gui = await player.waitForGui(g => g.title.includes('Activity'));
-     * 
+     *
      * // New (recommended):
      * const gui = await player.gui({ title: /Activity/ });
      */
     waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<GuiWrapper>;
-    
+
     /**
      * @deprecated Use `gui.locator(predicate)` with expectations instead. This method will be removed in a future version.
-     * 
+     *
      * @example
      * // Old (deprecated):
      * const item = await player.waitForGuiItem(i => i.name.includes('clock'));
-     * 
+     *
      * // New (recommended):
      * const gui = await player.gui({ title: /Activity/ });
      * const item = gui.locator(i => i.name.includes('clock'));
      * await expect(item).toHaveLore('some text');
      */
     waitForGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<ItemWrapper>;
-    
+
     /**
      * @deprecated Use `gui.locator(predicate).click()` instead. This method will be removed in a future version.
-     * 
+     *
      * @example
      * // Old (deprecated):
      * await player.clickGuiItem(i => i.name.includes('clock'));
-     * 
+     *
      * // New (recommended):
      * const gui = await player.gui({ title: /Activity/ });
      * const item = gui.locator(i => i.name.includes('clock'));
      * await item.click();
      */
     clickGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<void>;
-    
+
     gui: (options: { title: string | RegExp; timeout?: number }) => Promise<LiveGuiHandle>;
     private serverWrapper?: ServerWrapper;
 
@@ -572,7 +575,7 @@ export async function runTestSession(): Promise<void> {
                     });
                 } finally {
                     bot.removeAllListeners();
-                    
+
                     await new Promise<void>((resolve) => {
                         const timeout = setTimeout(() => {
                             console.log(`[WARNING] Bot ${bot.username} disconnect timeout, continuing anyway`);
@@ -591,7 +594,7 @@ export async function runTestSession(): Promise<void> {
                             resolve();
                         }
                     });
-                    
+
                     currentPlayer = null;
                     const index = activeBots.indexOf(bot);
                     if (index > -1) activeBots.splice(index, 1);
@@ -627,7 +630,7 @@ export async function runTestSession(): Promise<void> {
             console.log('');
 
             exitCode = 1;
-            
+
             throw new Error(`${failed.length} test(s) failed`);
         } else {
             console.log('\nAll tests passed!');
