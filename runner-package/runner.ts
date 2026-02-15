@@ -292,7 +292,6 @@ export class PlayerWrapper {
     async chat(message: string): Promise<void> {
         console.log(`[Bot] Chatting: ${message}`);
         this.bot.chat(message);
-        await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     async makeOp(): Promise<void> {
@@ -300,6 +299,7 @@ export class PlayerWrapper {
             throw new Error('ServerWrapper not set. This should not happen in test context.');
         }
         await this.serverWrapper.execute(`minecraft:op ${this.username}`);
+        await new RunnerMatchers(this).toHaveReceivedMessage(`Made ${this.bot.username} a server operator`);
     }
 
     async deOp(): Promise<void> {
@@ -545,7 +545,6 @@ export async function runTestSession(): Promise<void> {
                             serverProcess.stdin.write(cmd + '\n', (err) => {
                                 if (err) console.error(`[Server] Write error: ${err}`);
                             });
-                            await new Promise(r => setTimeout(r, 500));
                         }
                     };
 
