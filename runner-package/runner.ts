@@ -44,6 +44,16 @@ export function test(name: string, fn: (context: TestContext) => Promise<void>):
     testRegistry.push({ name, fn });
 }
 
+export function opTest(name: string, fn: (context: TestContext) => Promise<void>): void {
+    testRegistry.push({
+        name,
+        fn: async (context: TestContext) => {
+            await context.player.makeOp();
+            await fn(context);
+        }
+    });
+}
+
 function waitFor<T>(
     checkFn: () => T | undefined,
     emitter: EventEmitterLike | null,
