@@ -35,23 +35,74 @@ interface EventEmitterLike {
 }
 
 
+type Hook = (context: TestContext) => Promise<void>;
+
+interface DescribeScope {
+    label: string;
+    beforeHooks: Hook[];
+    afterHooks: Hook[];
+}
+
 const testRegistry: TestCase[] = [];
+const scopeStack: DescribeScope[] = [{ label: '', beforeHooks: [], afterHooks: [] }];
 let currentPlayer: Bot | null = null;
 let messageBuffer: string[] = [];
 const activeBots: Bot[] = [];
 
 export function test(name: string, fn: (context: TestContext) => Promise<void>): void {
-    testRegistry.push({ name, fn });
+    const labels = scopeStack.map(s => s.label).filter(l => l);
+    const fullName = [...labels, name].join(' > ');
+
+    // Snapshot hooks at registration time. Note: hooks registered *after* a test()
+    // call within the same describe block will not apply to it — declare hooks first.
+    const beforeHooks = scopeStack.flatMap(s => s.beforeHooks);
+    const afterHooks = [...scopeStack].reverse().flatMap(s => s.afterHooks);
+
+    const wrappedFn = async (ctx: TestContext) => {
+        let testError: unknown;
+        try {
+            for (const hook of beforeHooks) await hook(ctx);
+            await fn(ctx);
+        } catch (e) {
+            testError = e;
+        } finally {
+            for (const hook of afterHooks) {
+                try {
+                    await hook(ctx);
+                } catch (e) {
+                    testError ??= e;
+                    console.error('[afterEach] Hook error:', (e as Error).message);
+                }
+            }
+        }
+        if (testError) throw testError;
+    };
+
+    testRegistry.push({ name: fullName, fn: wrappedFn });
 }
 
 export function opTest(name: string, fn: (context: TestContext) => Promise<void>): void {
-    testRegistry.push({
-        name,
-        fn: async (context: TestContext) => {
-            await context.player.makeOp();
-            await fn(context);
-        }
+    test(name, async (context: TestContext) => {
+        await context.player.makeOp();
+        await fn(context);
     });
+}
+
+export function describe(label: string, fn: () => void): void {
+    scopeStack.push({ label, beforeHooks: [], afterHooks: [] });
+    try {
+        fn(); // synchronous — collects nested test/describe/beforeEach/afterEach calls
+    } finally {
+        scopeStack.pop();
+    }
+}
+
+export function beforeEach(hook: Hook): void {
+    scopeStack[scopeStack.length - 1].beforeHooks.push(hook);
+}
+
+export function afterEach(hook: Hook): void {
+    scopeStack[scopeStack.length - 1].afterHooks.push(hook);
 }
 
 function waitFor<T>(
