@@ -167,7 +167,8 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
     async toContainItem(this: RunnerMatchers<PlayerWrapper>, itemName: string): Promise<void> {
         const player = this.actual;
         const bot = player.bot;
-        const checkFn = (): boolean => bot.inventory.items().some(item => item.name.includes(itemName));
+        const checkFn = (): true | undefined =>
+            bot.inventory.items().some(item => item.name.includes(itemName)) ? true : undefined;
 
         if (this.isNot) {
             await this.pollForAbsence(
