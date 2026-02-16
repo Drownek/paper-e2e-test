@@ -1,13 +1,32 @@
-/**
- * General-purpose async test utilities.
- */
-
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /**
- * Retries `fn` on an interval until it resolves without throwing, or the
- * timeout elapses. Useful for assertions that may not be immediately true
- * after triggering an action.
+ * Polls `fn` until it returns a non-undefined value, or throws on timeout.
+ * Simple, race-condition-free, works with any state.
+ */
+export async function poll<T>(
+    fn: () => T | undefined | Promise<T | undefined>,
+    options: {
+        timeout?: number;
+        interval?: number;
+        message?: string;
+    } = {}
+): Promise<T> {
+    const { timeout = 5000, interval = 50, message = 'poll() timed out' } = options;
+    const deadline = Date.now() + timeout;
+
+    while (Date.now() < deadline) {
+        const result = await fn();
+        if (result !== undefined) return result;
+        await sleep(interval);
+    }
+
+    throw new Error(`Timeout: ${message}`);
+}
+
+/**
+ * Polls `fn` until it resolves without throwing, or the timeout elapses.
+ * Useful for assertions that may not be immediately true.
  */
 export async function eventually(
     fn: () => Promise<void>,
