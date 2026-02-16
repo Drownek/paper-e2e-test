@@ -1,6 +1,6 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import mineflayer, { Bot } from 'mineflayer';
-import { readdir, writeFile, readFile } from 'fs/promises';
+import { readdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -9,6 +9,7 @@ import { Matchers } from "./lib/expect.js";
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
 import { captureCallSite, extractLineNumberFromStack } from './lib/stack-trace.js';
+import { eventually, poll } from './lib/utils.js';
 
 // Enable source map support for accurate TypeScript stack traces
 installSourceMapSupport();
@@ -105,52 +106,6 @@ export function afterEach(hook: Hook): void {
     scopeStack[scopeStack.length - 1].afterHooks.push(hook);
 }
 
-function waitFor<T>(
-    checkFn: () => T | undefined,
-    emitter: EventEmitterLike | null,
-    eventName: string,
-    predicateFn: (...args: unknown[]) => T | undefined,
-    timeoutMsg: string,
-    timeoutMs: number = 5000
-): Promise<T> {
-    const result = checkFn();
-    if (result) return Promise.resolve(result);
-
-    return new Promise((resolve, reject) => {
-        if (!emitter) {
-            reject(new Error('No event emitter available'));
-            return;
-        }
-
-        let handler: (...args: unknown[]) => void;
-        const timeout = setTimeout(() => {
-            emitter.removeListener(eventName, handler);
-            reject(new Error(`Timeout: ${timeoutMsg}`));
-        }, timeoutMs);
-
-        handler = (...args: unknown[]) => {
-            const res = predicateFn(...args);
-            if (res) {
-                clearTimeout(timeout);
-                emitter.removeListener(eventName, handler);
-                resolve(res);
-            }
-        };
-
-        emitter.on(eventName, handler);
-    });
-}
-
-function waitForState<T>(
-    checkFn: () => T | undefined,
-    emitter: EventEmitterLike | null,
-    eventName: string,
-    timeoutMsg: string,
-    timeoutMs: number = 5000
-): Promise<T> {
-    return waitFor(checkFn, emitter, eventName, checkFn, timeoutMsg, timeoutMs);
-}
-
 class RunnerMatchers<T = unknown> extends Matchers<T> {
     private readonly callSite: string;
 
@@ -179,9 +134,11 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         }
     }
 
-    async toHaveReceivedMessage(this: RunnerMatchers<PlayerWrapper>, expectedMessage: string | RegExp, strict: boolean = false): Promise<void> {
-        const player = this.actual;
-        const bot = player.bot;
+    async toHaveReceivedMessage(
+        this: RunnerMatchers<PlayerWrapper>,
+        expectedMessage: string | RegExp,
+        strict: boolean = false
+    ): Promise<void> {
         const isMatch = (msg: string): boolean => {
             if (expectedMessage instanceof RegExp) return expectedMessage.test(msg);
             return strict ? msg === expectedMessage : msg.includes(expectedMessage);
@@ -190,95 +147,96 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         if (this.isNot) {
             await this.pollForAbsence(
                 () => messageBuffer.find(isMatch),
-                (foundMsg) => `Expected NOT to receive message matching "${expectedMessage}", but received: "${foundMsg}"`
+                (found) => `Expected NOT to receive message matching "${expectedMessage}", but received: "${found}"`
             );
             return;
         }
 
         try {
-            const checkFn = (): string | undefined => messageBuffer.find(isMatch);
-            await waitFor(
-                checkFn,
-                bot,
-                'message',
-                (jsonMsg: unknown): string | undefined => {
-                    const msgStr = String(jsonMsg);
-                    return isMatch(msgStr) ? msgStr : undefined;
-                },
-                `Expected message "${expectedMessage}" not received`
+            await poll(
+                () => messageBuffer.find(isMatch),
+                { message: `Expected message matching "${expectedMessage}" not received` }
             );
         } catch (error) {
-            // Replace the error stack with our captured call site
             const newError = new Error((error as Error).message);
             newError.stack = this.callSite;
             throw newError;
         }
     }
 
-    async toContainItem(this: RunnerMatchers<PlayerWrapper>, itemName: string): Promise<void> {
+    async toContainItem(this: RunnerMatchers<PlayerWrapper>, itemName: string, count: number | undefined = undefined): Promise<void> {
         const player = this.actual;
         const bot = player.bot;
-        const checkFn = (): true | undefined =>
-            bot.inventory.items().some(item => item.name.includes(itemName)) ? true : undefined;
 
         if (this.isNot) {
             await this.pollForAbsence(
                 () => {
-                    const found = bot.inventory.items().find(item => item.name.includes(itemName));
-                    return found ? found.name : undefined;
+                    const items = bot.inventory.items().filter(i => i.name.includes(itemName));
+                    if (items.length === 0) return undefined; // no items — absence confirmed
+
+                    const total = items.reduce((sum, i) => sum + i.count, 0);
+
+                    // No count specified: any match is a failure
+                    if (count === undefined) return items[0].name;
+
+                    // Count specified: only fail if we have >= that many
+                    return total >= count ? `${total}` : undefined;
                 },
-                (foundItemName) => `Expected inventory NOT to contain item "${itemName}", but found: "${foundItemName}"`
+                (found) => count !== undefined
+                    ? `Expected inventory NOT to contain ${count}x "${itemName}", but found ${found}`
+                    : `Expected inventory NOT to contain "${itemName}", but found: "${found}"`
             );
             return;
         }
 
+        const errorMsg = count !== undefined
+            ? `Expected ${count}x "${itemName}" in inventory`
+            : `Expected item "${itemName}" in inventory`;
+
         try {
-            await waitForState(checkFn, bot, 'windowUpdate', `Expected item "${itemName}" not found`);
+            await eventually(async () => {
+                const items = bot.inventory.items().filter(i => i.name.includes(itemName));
+                if (items.length === 0) throw new Error(errorMsg);
+                const total = items.reduce((sum, i) => sum + i.count, 0);
+                if (count !== undefined && total < count) throw new Error(errorMsg);
+            });
         } catch (error) {
-            // Replace the error stack with our captured call site
             const newError = new Error((error as Error).message);
             newError.stack = this.callSite;
             throw newError;
         }
     }
 
-    async toHaveLore(this: RunnerMatchers<GuiItemLocator>, expectedLore: string, options: { timeout?: number; pollingRate?: number } = {}): Promise<void> {
+    async toHaveLore(
+        this: RunnerMatchers<GuiItemLocator>,
+        expectedLore: string,
+        options: { timeout?: number; pollingRate?: number } = {}
+    ): Promise<void> {
         const { timeout = 5000, pollingRate = 100 } = options;
         const locator = this.actual;
-        const startTime = Date.now();
-
-        const checkFn = (): boolean => {
-            const loreText = locator.loreText();
-            return loreText.includes(expectedLore);
-        };
 
         if (this.isNot) {
-            // For negative assertions, poll until the lore no longer matches or timeout
-            while (Date.now() - startTime < timeout) {
-                if (!checkFn()) {
-                    return; // Success: lore doesn't match
-                }
-                await new Promise(resolve => setTimeout(resolve, pollingRate));
-            }
-            const error = new Error(`Expected locator NOT to have lore containing "${expectedLore}", but it does`);
+            await this.pollForAbsence(
+                () => locator.loreText().includes(expectedLore) ? locator.loreText() : undefined,
+                (found) => `Expected locator NOT to have lore containing "${expectedLore}", but got: "${found}"`,
+                timeout,
+                pollingRate
+            );
+            return;
+        }
+
+        try {
+            await poll(
+                () => locator.loreText().includes(expectedLore) ? true : undefined,
+                { timeout, interval: pollingRate, message: '' }
+            );
+        } catch {
+            const error = new Error(
+                `Expected locator to have lore containing "${expectedLore}", but got: "${locator.loreText()}"`
+            );
             error.stack = this.callSite;
             throw error;
         }
-
-        // For positive assertions, poll until the lore matches or timeout
-        while (Date.now() - startTime < timeout) {
-            if (checkFn()) {
-                return; // Success: lore matches
-            }
-            await new Promise(resolve => setTimeout(resolve, pollingRate));
-        }
-
-        const currentLore = locator.loreText();
-        const error = new Error(
-            `Expected locator to have lore containing "${expectedLore}", but got: "${currentLore}"`
-        );
-        error.stack = this.callSite;
-        throw error;
     }
 }
 export function expect<T>(target: T): RunnerMatchers<T> {
