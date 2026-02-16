@@ -318,51 +318,83 @@ export class PlayerWrapper {
     }
 
     async makeOp(): Promise<void> {
-        if (!this.serverWrapper) {
-            throw new Error('ServerWrapper not set. This should not happen in test context.');
-        }
-        await this.serverWrapper.execute(`minecraft:op ${this.username}`);
-        await new RunnerMatchers(this).toHaveReceivedMessage(`Made ${this.bot.username} a server operator`);
+        this.requireServer();
+        await this.serverWrapper!.execute(`minecraft:op ${this.username}`);
+
+        await poll(
+            () => messageBuffer.find(m => m.includes(`Made ${this.username} a server operator`)),
+            { message: `Player ${this.username} was not opped` }
+        );
     }
 
     async deOp(): Promise<void> {
-        if (!this.serverWrapper) {
-            throw new Error('ServerWrapper not set. This should not happen in test context.');
-        }
-        await this.serverWrapper.execute(`minecraft:deop ${this.username}`);
+        await this.executeAndSync(`minecraft:deop ${this.username}`);
     }
 
     async setGameMode(mode: 'survival' | 'creative' | 'adventure' | 'spectator'): Promise<void> {
-        if (!this.serverWrapper) {
-            throw new Error('ServerWrapper not set. This should not happen in test context.');
-        }
-        await this.serverWrapper.execute(`minecraft:gamemode ${mode} ${this.username}`);
-        let checkFn = () => this.bot.game.gameMode === mode ? true : undefined;
-        await waitForState(checkFn, this.bot, 'game', `Game mode did not change to ${mode}`);
+        this.requireServer();
+        await this.serverWrapper!.execute(`minecraft:gamemode ${mode} ${this.username}`);
+
+        await poll(
+            () => this.bot.game.gameMode === mode ? true : undefined,
+            { message: `Game mode did not change to "${mode}"` }
+        );
     }
 
     async teleport(x: number, y: number, z: number): Promise<void> {
-        if (!this.serverWrapper) {
-            throw new Error('ServerWrapper not set. This should not happen in test context.');
-        }
-        await this.serverWrapper.execute(`minecraft:tp ${this.username} ${x} ${y} ${z}`);
-        const isAtTarget = (): true | undefined => {
-            const pos = this.bot.entity.position;
-            return (Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1 && Math.abs(pos.z - z) < 1) ? true : undefined;
-        };
-        await waitForState(isAtTarget, this.bot, 'move', `Teleport to ${x} ${y} ${z} timed out`);
+        this.requireServer();
+        await this.serverWrapper!.execute(`minecraft:tp ${this.username} ${x} ${y} ${z}`);
+
+        await poll(
+            () => {
+                const pos = this.bot.entity.position;
+                const close =
+                    Math.abs(pos.x - x) < 1 &&
+                    Math.abs(pos.y - y) < 1 &&
+                    Math.abs(pos.z - z) < 1;
+                return close ? true : undefined;
+            },
+            { message: `Teleport to ${x} ${y} ${z} timed out` }
+        );
     }
 
     async giveItem(item: string, count: number = 1): Promise<void> {
+        this.requireServer();
+        await this.serverWrapper!.execute(`minecraft:give ${this.username} ${item} ${count}`);
+
+        await poll(
+            () => {
+                const total = this.bot.inventory.items()
+                    .filter(i => i.name.includes(item))
+                    .reduce((sum, i) => sum + i.count, 0);
+                return total >= count ? true : undefined;
+            },
+            { message: `Expected ${count}x "${item}" in inventory` }
+        );
+    }
+
+    private requireServer(): void {
         if (!this.serverWrapper) {
-            throw new Error('ServerWrapper not set. This should not happen in test context.');
+            throw new Error('ServerWrapper not set on PlayerWrapper');
         }
-        await this.serverWrapper.execute(`minecraft:give ${this.username} ${item} ${count}`);
-        await waitForState(
-            () => this.bot.inventory.items().some(i => i.name.includes(item)) ? true : undefined,
-            this.bot,
-            'windowUpdate',
-            `Item ${item} not received in inventory`
+    }
+
+    /**
+     * Executes a server command and waits for the server to finish processing it.
+     *
+     * Only guarantees synchronous dispatch completed. If a plugin schedules
+     * async work (delayed tasks, DB calls), use `poll()` to wait for the
+     * observable effect instead.
+     */
+    private async executeAndSync(cmd: string): Promise<void> {
+        this.requireServer();
+        const syncId = `sync_${randomUUID().split('-')[0]}`;
+        await this.serverWrapper!.execute(cmd);
+        await this.serverWrapper!.execute(`minecraft:say ${syncId}`);
+
+        await poll(
+            () => messageBuffer.find(m => m.includes(syncId)),
+            { message: `Server command sync timed out for: ${cmd}` }
         );
     }
 }
@@ -594,6 +626,11 @@ export async function runTestSession(): Promise<void> {
                     const errorMsg = (error as Error).message;
                     const stack = (error as Error).stack;
                     const location = extractLineNumberFromStack(stack, file);
+
+                    if (!location) {
+                        console.log(`[DEBUG] Could not extract line number from stack for file "${file}"`);
+                        console.log(`[DEBUG] Stack:\n${stack}`);
+                    }
 
                     console.log(`    FAILED: ${errorMsg}\n`);
 
