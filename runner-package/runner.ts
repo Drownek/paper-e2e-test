@@ -90,6 +90,16 @@ function waitFor<T>(
     });
 }
 
+function waitForState<T>(
+    checkFn: () => T | undefined,
+    emitter: EventEmitterLike | null,
+    eventName: string,
+    timeoutMsg: string,
+    timeoutMs: number = 5000
+): Promise<T> {
+    return waitFor(checkFn, emitter, eventName, checkFn, timeoutMsg, timeoutMs);
+}
+
 class RunnerMatchers<T = unknown> extends Matchers<T> {
     private readonly callSite: string;
 
@@ -171,7 +181,7 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         }
 
         try {
-            await waitFor(checkFn, bot, 'windowUpdate', checkFn, `Expected item "${itemName}" not found`);
+            await waitForState(checkFn, bot, 'windowUpdate', `Expected item "${itemName}" not found`);
         } catch (error) {
             // Replace the error stack with our captured call site
             const newError = new Error((error as Error).message);
@@ -317,6 +327,8 @@ export class PlayerWrapper {
             throw new Error('ServerWrapper not set. This should not happen in test context.');
         }
         await this.serverWrapper.execute(`minecraft:gamemode ${mode} ${this.username}`);
+        let checkFn = () => this.bot.game.gameMode === mode ? true : undefined;
+        await waitForState(checkFn, this.bot, 'game', `Game mode did not change to ${mode}`);
     }
 
     async teleport(x: number, y: number, z: number): Promise<void> {
@@ -324,6 +336,11 @@ export class PlayerWrapper {
             throw new Error('ServerWrapper not set. This should not happen in test context.');
         }
         await this.serverWrapper.execute(`minecraft:tp ${this.username} ${x} ${y} ${z}`);
+        const isAtTarget = (): true | undefined => {
+            const pos = this.bot.entity.position;
+            return (Math.abs(pos.x - x) < 1 && Math.abs(pos.y - y) < 1 && Math.abs(pos.z - z) < 1) ? true : undefined;
+        };
+        await waitForState(isAtTarget, this.bot, 'move', `Teleport to ${x} ${y} ${z} timed out`);
     }
 
     async giveItem(item: string, count: number = 1): Promise<void> {
@@ -331,6 +348,12 @@ export class PlayerWrapper {
             throw new Error('ServerWrapper not set. This should not happen in test context.');
         }
         await this.serverWrapper.execute(`minecraft:give ${this.username} ${item} ${count}`);
+        await waitForState(
+            () => this.bot.inventory.items().some(i => i.name.includes(item)) ? true : undefined,
+            this.bot,
+            'windowUpdate',
+            `Item ${item} not received in inventory`
+        );
     }
 }
 
@@ -696,3 +719,5 @@ export async function runTestSession(): Promise<void> {
         }, 1000).unref();
     }
 }
+
+export { sleep, eventually } from './lib/utils.js';
