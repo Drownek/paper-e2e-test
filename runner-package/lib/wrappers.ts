@@ -76,7 +76,41 @@ export class GuiItemLocator {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        throw new Error(`[GuiItemLocator] Timeout waiting for item to exist (${timeout}ms)`);
+        throw new Error(
+            `[GuiItemLocator] Timeout waiting for item to exist (${timeout}ms)\n` +
+            `Gui items snapshot (may differ from what was checked during polling):\n` +
+            `${this._formatItemTable()}\n`
+        );
+    }
+
+    _formatItemTable(): string {
+        const items = this.gui._getCurrentGuiSnapshot()?.items ?? [];
+        const rows = items.map(item => ({
+            slot: item.slot,
+            name: item.name,
+            displayName: item.getDisplayName(),
+            lore: item.getLore().join(' | ')
+        }));
+
+        if (rows.length === 0) {
+            return '(no items)';
+        }
+
+        const headers = ['Slot', 'Name', 'DisplayName', 'Lore'];
+        const widths = [
+            Math.max(4, ...rows.map(r => String(r.slot).length)),
+            Math.max(4, ...rows.map(r => r.name.length)),
+            Math.max(11, ...rows.map(r => r.displayName.length)),
+            Math.max(4, ...rows.map(r => r.lore.length)),
+        ];
+
+        const header = headers.map((h, i) => h.padEnd(widths[i])).join(' | ');
+        const separator = widths.map(w => '-'.repeat(w)).join('-+-');
+        const body = rows.map(r =>
+            `${String(r.slot).padEnd(widths[0])} | ${r.name.padEnd(widths[1])} | ${r.displayName.padEnd(widths[2])} | ${r.lore}`
+        ).join('\n');
+
+        return [header, separator, body].join('\n');
     }
 
     /**
