@@ -8,7 +8,7 @@ import { ItemWrapper, GuiWrapper, createPlayerExtensions, Window, LiveGuiHandle,
 import { Matchers } from "./lib/expect.js";
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
-import { captureCallSite, extractLineNumberFromStack } from './lib/stack-trace.js';
+import { extractLineNumberFromStack } from './lib/stack-trace.js';
 import { poll } from './lib/utils.js';
 
 // Enable source map support for accurate TypeScript stack traces
@@ -107,11 +107,8 @@ export function afterEach(hook: Hook): void {
 }
 
 class RunnerMatchers<T = unknown> extends Matchers<T> {
-    private readonly callSite: string;
-
     constructor(actual: T, isNot: boolean = false) {
         super(actual, isNot);
-        this.callSite = captureCallSite(RunnerMatchers);
     }
 
     protected async pollAssertion(

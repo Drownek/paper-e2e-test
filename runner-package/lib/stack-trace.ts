@@ -14,21 +14,6 @@ export interface StackLocation {
 }
 
 /**
- * Capture the current call-site stack trace as a string.
- *
- * @param constructorOpt - When provided, all frames at and above this function
- *   are stripped from the trace (standard V8 `captureStackTrace` behavior).
- *   Pass the constructor of the class whose instantiation you want to hide.
- */
-export function captureCallSite(constructorOpt?: Function): string {
-    const err = new Error();
-    if (constructorOpt) {
-        Error.captureStackTrace(err, constructorOpt);
-    }
-    return err.stack || '';
-}
-
-/**
  * Walk a V8 stack string and return the location of the first frame that
  * references `testFile`.
  *
