@@ -28,7 +28,7 @@ export async function poll<T>(
  * Polls `fn` until it resolves without throwing, or the timeout elapses.
  * Useful for assertions that may not be immediately true.
  */
-export async function eventually(
+export async function waitForAssertion(
     fn: () => Promise<void>,
     { timeout = 5000, interval = 250 } = {}
 ): Promise<void> {
@@ -45,4 +45,30 @@ export async function eventually(
         }
     }
     throw lastError;
+}
+
+/**
+ * Polls `predicate` until it returns `true`, or the timeout elapses.
+ * Useful for waiting on a condition that may not be immediately true.
+ *
+ * @throws {Error} if the condition is not met within the timeout.
+ */
+export async function waitUntil(
+    predicate: () => boolean | Promise<boolean>,
+    {
+        timeout = 5000,
+        interval = 250,
+        message = "waitUntil timed out: condition was not met",
+    } = {}
+): Promise<void> {
+    const start = Date.now();
+
+    while (Date.now() - start < timeout) {
+        if (await predicate()) {
+            return; // condition met
+        }
+        await sleep(interval);
+    }
+
+    throw new Error(message);
 }
