@@ -9,7 +9,7 @@ export async function poll<T>(
     options: {
         timeout?: number;
         interval?: number;
-        message?: string;
+        message?: string | (() => string);
     } = {}
 ): Promise<T> {
     const { timeout = 5000, interval = 50, message = 'poll() timed out' } = options;
@@ -21,7 +21,7 @@ export async function poll<T>(
         await sleep(interval);
     }
 
-    throw new Error(`Timeout: ${message}`);
+    throw new Error(`Timeout: ${typeof message === 'function' ? message() : message}`);
 }
 
 /**
