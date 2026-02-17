@@ -9,7 +9,7 @@ import { Matchers } from "./lib/expect.js";
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
 import { captureCallSite, extractLineNumberFromStack } from './lib/stack-trace.js';
-import { eventually, poll } from './lib/utils.js';
+import { poll } from './lib/utils.js';
 
 // Enable source map support for accurate TypeScript stack traces
 installSourceMapSupport();
@@ -111,27 +111,30 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
 
     constructor(actual: T, isNot: boolean = false) {
         super(actual, isNot);
-
         this.callSite = captureCallSite(RunnerMatchers);
     }
 
-    private async pollForAbsence(
-        checkFn: () => unknown,
-        buildErrorMsg: (foundValue: unknown) => string,
-        timeoutMs: number = 1000,
-        pollingRateMs: number = 50
+    protected async pollAssertion(
+        condition: () => boolean,
+        passMessage: () => string,
+        failMessage: () => string,
+        options: { timeout?: number; pollingRate?: number } = {}
     ): Promise<void> {
-        const startTime = Date.now();
+        const { timeout = 5000, pollingRate = 50 } = options;
 
-        while (Date.now() - startTime < timeoutMs) {
-            const result = checkFn();
-            if (result !== undefined) {
-                const error = new Error(buildErrorMsg(result));
-                error.stack = this.callSite;
-                throw error;
+        if (this.isNot) {
+            const startTime = Date.now();
+            while (Date.now() - startTime < timeout) {
+                if (condition()) throw new Error(passMessage());
+                await new Promise(resolve => setTimeout(resolve, pollingRate));
             }
-            await new Promise(resolve => setTimeout(resolve, pollingRateMs));
+            return;
         }
+
+        await poll(
+            () => condition() ? true : undefined,
+            { timeout, interval: pollingRate, message: failMessage }
+        );
     }
 
     async toHaveReceivedMessage(
@@ -144,67 +147,39 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
             return strict ? msg === expectedMessage : msg.includes(expectedMessage);
         };
 
-        if (this.isNot) {
-            await this.pollForAbsence(
-                () => messageBuffer.find(isMatch),
-                (found) => `Expected NOT to receive message matching "${expectedMessage}", but received: "${found}"`
-            );
-            return;
-        }
-
-        try {
-            await poll(
-                () => messageBuffer.find(isMatch),
-                { message: `Expected message matching "${expectedMessage}" not received` }
-            );
-        } catch (error) {
-            const newError = new Error((error as Error).message);
-            newError.stack = this.callSite;
-            throw newError;
-        }
+        await this.pollAssertion(
+            () => messageBuffer.some(isMatch),
+            () => `Expected NOT to receive message matching "${expectedMessage}", but received: "${messageBuffer.find(isMatch)}"`,
+            () => `Expected message matching "${expectedMessage}" not received`
+        );
     }
 
-    async toContainItem(this: RunnerMatchers<PlayerWrapper>, itemName: string, count: number | undefined = undefined): Promise<void> {
-        const player = this.actual;
-        const bot = player.bot;
+    async toContainItem(
+        this: RunnerMatchers<PlayerWrapper>,
+        itemName: string,
+        count: number | undefined = undefined
+    ): Promise<void> {
+        const bot = this.actual.bot;
 
-        if (this.isNot) {
-            await this.pollForAbsence(
-                () => {
-                    const items = bot.inventory.items().filter(i => i.name.includes(itemName));
-                    if (items.length === 0) return undefined; // no items — absence confirmed
+        const getItems = () => bot.inventory.items().filter(i => i.name.includes(itemName));
+        const getTotal = () => getItems().reduce((sum, i) => sum + i.count, 0);
 
-                    const total = items.reduce((sum, i) => sum + i.count, 0);
+        const condition = () => {
+            const items = getItems();
+            if (items.length === 0) return false;
+            if (count !== undefined) return getTotal() >= count;
+            return true;
+        };
 
-                    // No count specified: any match is a failure
-                    if (count === undefined) return items[0].name;
-
-                    // Count specified: only fail if we have >= that many
-                    return total >= count ? `${total}` : undefined;
-                },
-                (found) => count !== undefined
-                    ? `Expected inventory NOT to contain ${count}x "${itemName}", but found ${found}`
-                    : `Expected inventory NOT to contain "${itemName}", but found: "${found}"`
-            );
-            return;
-        }
-
-        const errorMsg = count !== undefined
-            ? `Expected ${count}x "${itemName}" in inventory`
-            : `Expected item "${itemName}" in inventory`;
-
-        try {
-            await eventually(async () => {
-                const items = bot.inventory.items().filter(i => i.name.includes(itemName));
-                if (items.length === 0) throw new Error(errorMsg);
-                const total = items.reduce((sum, i) => sum + i.count, 0);
-                if (count !== undefined && total < count) throw new Error(errorMsg);
-            });
-        } catch (error) {
-            const newError = new Error((error as Error).message);
-            newError.stack = this.callSite;
-            throw newError;
-        }
+        await this.pollAssertion(
+            condition,
+            () => count !== undefined
+                ? `Expected inventory NOT to contain ${count}x "${itemName}", but found ${getTotal()}`
+                : `Expected inventory NOT to contain "${itemName}", but found: "${getItems()[0]?.name}"`,
+            () => count !== undefined
+                ? `Expected ${count}x "${itemName}" in inventory, but found ${getTotal()}`
+                : `Expected item "${itemName}" in inventory`
+        );
     }
 
     async toHaveLore(
@@ -215,30 +190,56 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         const { timeout = 5000, pollingRate = 100 } = options;
         const locator = this.actual;
 
-        if (this.isNot) {
-            await this.pollForAbsence(
-                () => locator.loreText().includes(expectedLore) ? locator.loreText() : undefined,
-                (found) => `Expected locator NOT to have lore containing "${expectedLore}", but got: "${found}"`,
-                timeout,
-                pollingRate
-            );
-            return;
-        }
+        await this.pollAssertion(
+            () => locator.loreText().includes(expectedLore),
+            () => `Expected locator NOT to have lore containing "${expectedLore}", but got: "${locator.loreText()}"`,
+            () => `Expected locator to have lore containing "${expectedLore}", but got: "${locator.loreText()}"`,
+            { timeout, pollingRate }
+        );
+    }
 
-        try {
-            await poll(
-                () => locator.loreText().includes(expectedLore) ? true : undefined,
-                { timeout, interval: pollingRate, message: '' }
-            );
-        } catch {
-            const error = new Error(
-                `Expected locator to have lore containing "${expectedLore}", but got: "${locator.loreText()}"`
-            );
-            error.stack = this.callSite;
-            throw error;
-        }
+    async toBeNear(
+        this: RunnerMatchers<PlayerWrapper>,
+        x: number,
+        y: number | undefined,
+        z: number,
+        options: { tolerance?: number; timeout?: number } = {}
+    ): Promise<void> {
+        const { tolerance = 1, timeout = 5000 } = options;
+        const player = this.actual;
+        const pos = () => player.bot.entity.position;
+
+        const isNear = () =>
+            Math.abs(pos().x - x) < tolerance &&
+            Math.abs(pos().z - z) < tolerance &&
+            (y === undefined || Math.abs(pos().y - y) < tolerance);
+
+        const targetStr = y !== undefined
+            ? `(${x}, ${y}, ${z})`
+            : `(${x}, *, ${z})`;
+
+        const posStr = () => y !== undefined
+            ? `(${pos().x.toFixed(2)}, ${pos().y.toFixed(2)}, ${pos().z.toFixed(2)})`
+            : `(${pos().x.toFixed(2)}, *, ${pos().z.toFixed(2)})`;
+
+        await this.pollAssertion(
+            isNear,
+            () => `Expected player NOT to be near ${targetStr}, but was at ${posStr()}`,
+            () => `Expected player to be near ${targetStr}, but was at ${posStr()}`,
+            { timeout }
+        );
+    }
+
+    async toBeNearXZ(
+        this: RunnerMatchers<PlayerWrapper>,
+        x: number,
+        z: number,
+        options: { tolerance?: number; timeout?: number } = {}
+    ): Promise<void> {
+        return this.toBeNear(x, undefined, z, options);
     }
 }
+
 export function expect<T>(target: T): RunnerMatchers<T> {
     return new RunnerMatchers(target);
 }
@@ -766,4 +767,4 @@ export async function runTestSession(): Promise<void> {
     }
 }
 
-export { sleep, eventually } from './lib/utils.js';
+export { sleep, waitForAssertion, waitUntil } from './lib/utils.js';
