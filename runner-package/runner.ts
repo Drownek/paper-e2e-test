@@ -132,8 +132,9 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
     async toHaveReceivedMessage(
         this: RunnerMatchers<PlayerWrapper>,
         expectedMessage: string | RegExp,
-        strict: boolean = false
+        options: { strict?: boolean; timeout?: number; pollingRate?: number } = {}
     ): Promise<void> {
+        const { strict = false, timeout, pollingRate } = options;
         const isMatch = (msg: string): boolean => {
             if (expectedMessage instanceof RegExp) return expectedMessage.test(msg);
             return strict ? msg === expectedMessage : msg.includes(expectedMessage);
@@ -142,15 +143,17 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         await this.pollAssertion(
             () => messageBuffer.some(isMatch),
             () => `Expected NOT to receive message matching "${expectedMessage}", but received: "${messageBuffer.find(isMatch)}"`,
-            () => `Expected message matching "${expectedMessage}" not received`
+            () => `Expected message matching "${expectedMessage}" not received`,
+            { timeout, pollingRate }
         );
     }
 
     async toContainItem(
         this: RunnerMatchers<PlayerWrapper>,
         itemName: string,
-        count: number | undefined = undefined
+        options: { count?: number; timeout?: number; pollingRate?: number } = {}
     ): Promise<void> {
+        const { count, timeout, pollingRate } = options;
         const bot = this.actual.bot;
 
         const getItems = () => bot.inventory.items().filter(i => i.name.includes(itemName));
@@ -170,7 +173,8 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
                 : `Expected inventory NOT to contain "${itemName}", but found: "${getItems()[0]?.name}"`,
             () => count !== undefined
                 ? `Expected ${count}x "${itemName}" in inventory, but found ${getTotal()}`
-                : `Expected item "${itemName}" in inventory`
+                : `Expected item "${itemName}" in inventory`,
+            { timeout, pollingRate }
         );
     }
 
@@ -202,9 +206,9 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         const pos = () => player.bot.entity.position;
 
         const isNear = () =>
-            Math.abs(pos().x - x) < tolerance &&
-            Math.abs(pos().z - z) < tolerance &&
-            (y === undefined || Math.abs(pos().y - y) < tolerance);
+            Math.abs(pos().x - x) <= tolerance &&
+            Math.abs(pos().z - z) <= tolerance &&
+            (y === undefined || Math.abs(pos().y - y) <= tolerance);
 
         const targetStr = y !== undefined
             ? `(${x}, ${y}, ${z})`
@@ -253,7 +257,7 @@ class PollMatchers<T> {
         return new PollMatchers(this.fn, this.options, !this.isNot);
     }
 
-    private async pollUntilPass(assertion: (matchers: Matchers<T>) => void): Promise<void> {
+    private async pollUntilPass(assertion: (matchers: Matchers<T>) => void | Promise<void>): Promise<void> {
         const { timeout, interval } = this.options;
         const deadline = Date.now() + timeout;
         let lastError: unknown;
@@ -262,7 +266,7 @@ class PollMatchers<T> {
             const value = await this.fn();
             try {
                 const m = new Matchers(value, this.isNot);
-                assertion(m);
+                await assertion(m);
                 return;
             } catch (e) {
                 lastError = e;
@@ -335,6 +339,12 @@ class PollMatchers<T> {
     }
     toBeInstanceOf(expected: Function): Promise<void> {
         return this.pollUntilPass(m => m.toBeInstanceOf(expected));
+    }
+    toThrow(expected?: string | RegExp | Function): Promise<void> {
+        return this.pollUntilPass(m => m.toThrow(expected));
+    }
+    toThrowAsync(expected?: string | RegExp | Function): Promise<void> {
+        return this.pollUntilPass(m => m.toThrowAsync(expected));
     }
 }
 
