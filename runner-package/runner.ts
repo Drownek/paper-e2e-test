@@ -118,20 +118,15 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         options: { timeout?: number; pollingRate?: number } = {}
     ): Promise<void> {
         const { timeout = 5000, pollingRate = 50 } = options;
+        const expected = !this.isNot;
+        const deadline = Date.now() + timeout;
 
-        if (this.isNot) {
-            const startTime = Date.now();
-            while (Date.now() - startTime < timeout) {
-                if (condition()) throw new Error(passMessage());
-                await new Promise(resolve => setTimeout(resolve, pollingRate));
-            }
-            return;
+        while (Date.now() < deadline) {
+            if (condition() === expected) return;
+            await new Promise(resolve => setTimeout(resolve, pollingRate));
         }
 
-        await poll(
-            () => condition() ? true : undefined,
-            { timeout, interval: pollingRate, message: failMessage }
-        );
+        throw new Error(this.isNot ? passMessage() : failMessage());
     }
 
     async toHaveReceivedMessage(
