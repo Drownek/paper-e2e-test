@@ -658,6 +658,8 @@ export async function runTestSession(): Promise<void> {
             console.log(`\nRunning tests from: ${file}`);
 
             testRegistry.length = 0;
+            scopeStack.length = 0;
+            scopeStack.push({ label: '', beforeHooks: [], afterHooks: [] });
             await import(pathToFileURL(join(process.cwd(), file)).href);
 
             for (const testCase of testRegistry) {
