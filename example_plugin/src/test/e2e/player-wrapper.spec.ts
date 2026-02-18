@@ -7,12 +7,12 @@ test('makeOp', async ({ player }) => {
 
 test('deOp', async ({ player }) => {
     await player.deOp();
-    await player.chat('/op');
+    player.chat('/op');
     await expect(player).toHaveReceivedMessage('Unknown command');
 });
 
 test('chat', async ({ player }) => {
-    await player.chat('/help');
+    player.chat('/help');
     await expect(player).toHaveReceivedMessage('Help');
 });
 

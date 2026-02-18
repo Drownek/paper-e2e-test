@@ -22,7 +22,7 @@ export interface TestContext {
 }
 
 export interface ServerWrapper {
-    execute: (cmd: string) => Promise<void>;
+    execute: (cmd: string) => void;
 }
 
 interface TestCase {
@@ -420,7 +420,7 @@ export class PlayerWrapper {
         return currentWindow ? new GuiWrapper(this.bot, currentWindow as Window) : null;
     }
 
-    async chat(message: string): Promise<void> {
+    chat(message: string): void {
         console.log(`[Bot] Chatting: ${message}`);
         this.bot.chat(message);
     }
@@ -445,7 +445,7 @@ export class PlayerWrapper {
 
     async makeOp(): Promise<void> {
         this.requireServer();
-        await this.serverWrapper!.execute(`minecraft:op ${this.username}`);
+        this.serverWrapper!.execute(`minecraft:op ${this.username}`);
 
         await poll(
             () => messageBuffer.find(m => m.includes(`Made ${this.username} a server operator`)),
@@ -459,7 +459,7 @@ export class PlayerWrapper {
 
     async setGameMode(mode: 'survival' | 'creative' | 'adventure' | 'spectator'): Promise<void> {
         this.requireServer();
-        await this.serverWrapper!.execute(`minecraft:gamemode ${mode} ${this.username}`);
+        this.serverWrapper!.execute(`minecraft:gamemode ${mode} ${this.username}`);
 
         await poll(
             () => this.bot.game.gameMode === mode ? true : undefined,
@@ -469,7 +469,7 @@ export class PlayerWrapper {
 
     async teleport(x: number, y: number, z: number): Promise<void> {
         this.requireServer();
-        await this.serverWrapper!.execute(`minecraft:tp ${this.username} ${x} ${y} ${z}`);
+        this.serverWrapper!.execute(`minecraft:tp ${this.username} ${x} ${y} ${z}`);
 
         await poll(
             () => {
@@ -486,7 +486,7 @@ export class PlayerWrapper {
 
     async giveItem(item: string, count: number = 1): Promise<void> {
         this.requireServer();
-        await this.serverWrapper!.execute(`minecraft:give ${this.username} ${item} ${count}`);
+        this.serverWrapper!.execute(`minecraft:give ${this.username} ${item} ${count}`);
 
         await poll(
             () => {
@@ -515,8 +515,8 @@ export class PlayerWrapper {
     private async executeAndSync(cmd: string): Promise<void> {
         this.requireServer();
         const syncId = `sync_${randomUUID().split('-')[0]}`;
-        await this.serverWrapper!.execute(cmd);
-        await this.serverWrapper!.execute(`minecraft:say ${syncId}`);
+        this.serverWrapper!.execute(cmd);
+        this.serverWrapper!.execute(`minecraft:say ${syncId}`);
 
         await poll(
             () => messageBuffer.find(m => m.includes(syncId)),
@@ -744,7 +744,7 @@ export async function runTestSession(): Promise<void> {
 
                 try {
                     const server: ServerWrapper = {
-                        execute: async (cmd: string) => {
+                        execute: (cmd: string) => {
                             console.log(`[Server] Executing: ${cmd}`);
                             serverProcess.stdin.write(cmd + '\n', (err) => {
                                 if (err) console.error(`[Server] Write error: ${err}`);

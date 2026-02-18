@@ -51,7 +51,7 @@ Create `src/test/e2e/my-test.spec.js`:
 import { test, expect } from '@drownek/paper-e2e-runner';
 
 test('player receives welcome message', async ({ player }) => {
-  await player.chat('/help');
+  player.chat('/help');
   await expect(player).toHaveReceivedMessage('Available commands');
 });
 ```
