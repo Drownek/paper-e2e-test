@@ -563,10 +563,17 @@ interface TestResult {
     file: string;
     testName: string;
     passed: boolean;
+    durationMs: number;
     error?: string;
     stack?: string;
     lineNumber?: number;
     columnNumber?: number;
+}
+
+function formatDuration(ms: number): string {
+    if (ms < 1000) return `${ms}ms`;
+    const seconds = ms / 1000;
+    return `${seconds.toFixed(1)}s`;
 }
 
 export async function runTestSession(): Promise<void> {
@@ -718,6 +725,8 @@ export async function runTestSession(): Promise<void> {
                     console.log(`[DEBUG] Raw open_window packet:`, JSON.stringify(packet));
                 });
 
+                const testStartTime = Date.now();
+
                 try {
                     const server: ServerWrapper = {
                         execute: async (cmd: string) => {
@@ -732,9 +741,11 @@ export async function runTestSession(): Promise<void> {
                     player.setServerWrapper(server);
 
                     await testCase.fn({ player, server });
-                    console.log(`    PASSED\n`);
-                    testResults.push({ file, testName: testCase.name, passed: true });
+                    const durationMs = Date.now() - testStartTime;
+                    console.log(`    PASSED (${formatDuration(durationMs)})\n`);
+                    testResults.push({ file, testName: testCase.name, passed: true, durationMs });
                 } catch (error) {
+                    const durationMs = Date.now() - testStartTime;
                     const errorMsg = (error as Error).message;
                     const stack = (error as Error).stack;
                     const location = extractLineNumberFromStack(stack, file);
@@ -744,12 +755,13 @@ export async function runTestSession(): Promise<void> {
                         console.log(`[DEBUG] Stack:\n${stack}`);
                     }
 
-                    console.log(`    FAILED: ${errorMsg}\n`);
+                    console.log(`    FAILED (${formatDuration(durationMs)}): ${errorMsg}\n`);
 
                     testResults.push({
                         file,
                         testName: testCase.name,
                         passed: false,
+                        durationMs,
                         error: errorMsg,
                         stack,
                         lineNumber: location?.line,
@@ -791,9 +803,36 @@ export async function runTestSession(): Promise<void> {
         const passed = testResults.filter(r => r.passed);
         const failed = testResults.filter(r => !r.passed);
 
+        const totalDuration = testResults.reduce((sum, r) => sum + r.durationMs, 0);
+
         console.log(`Total: ${testResults.length}`);
         console.log(`Passed: ${passed.length}`);
         console.log(`Failed: ${failed.length}`);
+        console.log(`Duration: ${formatDuration(totalDuration)}`);
+
+        // Duration table
+        const statusCol = 'Status';
+        const testCol = 'Test';
+        const durationCol = 'Duration';
+
+        const statusWidth = Math.max(statusCol.length, ...(testResults.map(r => r.passed ? 'PASS' : 'FAIL').map(s => s.length)));
+        const durationWidth = Math.max(durationCol.length, ...testResults.map(r => formatDuration(r.durationMs).length));
+        const testWidth = Math.max(testCol.length, ...testResults.map(r => r.testName.length));
+
+        const header = `  ${statusCol.padEnd(statusWidth)}  ${testCol.padEnd(testWidth)}  ${durationCol.padStart(durationWidth)}`;
+        const separator = `  ${'─'.repeat(statusWidth)}  ${'─'.repeat(testWidth)}  ${'─'.repeat(durationWidth)}`;
+
+        console.log(`\n${header}`);
+        console.log(separator);
+
+        for (const result of testResults) {
+            const status = result.passed ? 'PASS' : 'FAIL';
+            const duration = formatDuration(result.durationMs);
+            console.log(`  ${status.padEnd(statusWidth)}  ${result.testName.padEnd(testWidth)}  ${duration.padStart(durationWidth)}`);
+        }
+
+        console.log(separator);
+        console.log(`  ${''.padEnd(statusWidth)}  ${'Total'.padEnd(testWidth)}  ${formatDuration(totalDuration).padStart(durationWidth)}`);
 
         if (failed.length > 0) {
             console.log('\nFailed Tests:');
