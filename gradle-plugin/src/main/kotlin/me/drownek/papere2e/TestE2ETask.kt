@@ -106,11 +106,21 @@ abstract class TestE2ETask : DefaultTask() {
             } else {
                 lines.add("connection-throttle=0")
             }
+
+            // Disable spawn protection so tests can damage players near spawn
+            val hasSpawnProtection = lines.any { it.trim().startsWith("spawn-protection=") }
+            if (hasSpawnProtection) {
+                lines = lines.map { line ->
+                    if (line.trim().startsWith("spawn-protection=")) "spawn-protection=0" else line
+                }.toMutableList()
+            } else {
+                lines.add("spawn-protection=0")
+            }
             
             Files.write(serverProperties.toPath(), lines)
         } else {
-            logger.lifecycle("Creating server.properties with online-mode=false and connection-throttle=0")
-            Files.write(serverProperties.toPath(), listOf("online-mode=false", "connection-throttle=0"))
+            logger.lifecycle("Creating server.properties with online-mode=false, connection-throttle=0 and spawn-protection=0")
+            Files.write(serverProperties.toPath(), listOf("online-mode=false", "connection-throttle=0", "spawn-protection=0"))
         }
 
         // Configure bukkit.yml settings
