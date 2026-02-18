@@ -430,6 +430,24 @@ export class PlayerWrapper {
         this.bot.chat(message);
     }
 
+    nextMessage(options: { timeout?: number } = {}): Promise<string> {
+        const { timeout = 5000 } = options;
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                this.bot.removeListener('message', handler);
+                reject(new Error('Timeout: no message received'));
+            }, timeout);
+
+            const handler = (jsonMsg: unknown) => {
+                clearTimeout(timer);
+                this.bot.removeListener('message', handler);
+                resolve(String(jsonMsg));
+            };
+
+            this.bot.on('message', handler);
+        });
+    }
+
     async makeOp(): Promise<void> {
         this.requireServer();
         await this.serverWrapper!.execute(`minecraft:op ${this.username}`);
