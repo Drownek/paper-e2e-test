@@ -458,6 +458,7 @@ export class PlayerWrapper {
     }
 
     async setGameMode(mode: 'survival' | 'creative' | 'adventure' | 'spectator'): Promise<void> {
+        if (this.bot.game.gameMode === mode) return;
         this.requireServer();
         this.serverWrapper!.execute(`minecraft:gamemode ${mode} ${this.username}`);
 
