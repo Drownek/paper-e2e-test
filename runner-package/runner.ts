@@ -9,7 +9,7 @@ import { Matchers } from "./lib/expect.js";
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
 import { extractLineNumberFromStack } from './lib/stack-trace.js';
-import { poll } from './lib/utils.js';
+import { poll, sleep } from './lib/utils.js';
 
 // Enable source map support for accurate TypeScript stack traces
 installSourceMapSupport();
@@ -237,9 +237,124 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
     }
 }
 
-export function expect<T>(target: T): RunnerMatchers<T> {
-    return new RunnerMatchers(target);
+interface PollOptions {
+    timeout?: number;
+    interval?: number;
+    message?: string;
 }
+
+class PollMatchers<T> {
+    private fn: () => T | Promise<T>;
+    private options: Required<Omit<PollOptions, 'message'>> & { message?: string };
+    private isNot: boolean;
+
+    constructor(fn: () => T | Promise<T>, options: PollOptions = {}, isNot: boolean = false) {
+        this.fn = fn;
+        this.options = { timeout: 5000, interval: 250, ...options };
+        this.isNot = isNot;
+    }
+
+    get not(): PollMatchers<T> {
+        return new PollMatchers(this.fn, this.options, !this.isNot);
+    }
+
+    private async pollUntilPass(assertion: (matchers: Matchers<T>) => void): Promise<void> {
+        const { timeout, interval } = this.options;
+        const deadline = Date.now() + timeout;
+        let lastError: unknown;
+
+        while (Date.now() < deadline) {
+            const value = await this.fn();
+            try {
+                const m = new Matchers(value, this.isNot);
+                assertion(m);
+                return;
+            } catch (e) {
+                lastError = e;
+            }
+            await sleep(Math.min(interval, Math.max(0, deadline - Date.now())));
+        }
+
+        if (this.options.message) {
+            throw new Error(this.options.message);
+        }
+        throw lastError;
+    }
+
+    toBe(expected: any): Promise<void> {
+        return this.pollUntilPass(m => m.toBe(expected));
+    }
+    toEqual(expected: any): Promise<void> {
+        return this.pollUntilPass(m => m.toEqual(expected));
+    }
+    toBeTruthy(): Promise<void> {
+        return this.pollUntilPass(m => m.toBeTruthy());
+    }
+    toBeFalsy(): Promise<void> {
+        return this.pollUntilPass(m => m.toBeFalsy());
+    }
+    toBeNull(): Promise<void> {
+        return this.pollUntilPass(m => m.toBeNull());
+    }
+    toBeUndefined(): Promise<void> {
+        return this.pollUntilPass(m => m.toBeUndefined());
+    }
+    toBeDefined(): Promise<void> {
+        return this.pollUntilPass(m => m.toBeDefined());
+    }
+    toBeNaN(): Promise<void> {
+        return this.pollUntilPass(m => m.toBeNaN());
+    }
+    toBeGreaterThan(expected: number): Promise<void> {
+        return this.pollUntilPass(m => (m as Matchers<number>).toBeGreaterThan(expected));
+    }
+    toBeGreaterThanOrEqual(expected: number): Promise<void> {
+        return this.pollUntilPass(m => (m as Matchers<number>).toBeGreaterThanOrEqual(expected));
+    }
+    toBeLessThan(expected: number): Promise<void> {
+        return this.pollUntilPass(m => (m as Matchers<number>).toBeLessThan(expected));
+    }
+    toBeLessThanOrEqual(expected: number): Promise<void> {
+        return this.pollUntilPass(m => (m as Matchers<number>).toBeLessThanOrEqual(expected));
+    }
+    toBeCloseTo(expected: number, precision?: number): Promise<void> {
+        return this.pollUntilPass(m => (m as Matchers<number>).toBeCloseTo(expected, precision));
+    }
+    toContain(item: any): Promise<void> {
+        return this.pollUntilPass(m => m.toContain(item));
+    }
+    toContainEqual(item: any): Promise<void> {
+        return this.pollUntilPass(m => m.toContainEqual(item));
+    }
+    toHaveLength(expected: number): Promise<void> {
+        return this.pollUntilPass(m => m.toHaveLength(expected));
+    }
+    toHaveProperty(keyPath: string | string[], value?: any): Promise<void> {
+        return this.pollUntilPass(m => m.toHaveProperty(keyPath, value));
+    }
+    toMatch(expected: string | RegExp): Promise<void> {
+        return this.pollUntilPass(m => m.toMatch(expected));
+    }
+    toMatchObject(expected: any): Promise<void> {
+        return this.pollUntilPass(m => m.toMatchObject(expected));
+    }
+    toBeInstanceOf(expected: Function): Promise<void> {
+        return this.pollUntilPass(m => m.toBeInstanceOf(expected));
+    }
+}
+
+interface ExpectFunction {
+    <T>(target: T): RunnerMatchers<T>;
+    poll: <T>(fn: () => T | Promise<T>, options?: PollOptions) => PollMatchers<T>;
+}
+
+export const expect: ExpectFunction = Object.assign(
+    <T>(target: T): RunnerMatchers<T> => new RunnerMatchers(target),
+    {
+        poll: <T>(fn: () => T | Promise<T>, options?: PollOptions): PollMatchers<T> =>
+            new PollMatchers(fn, options),
+    }
+);
 
 export class PlayerWrapper {
     bot: Bot;
