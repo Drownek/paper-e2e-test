@@ -7,7 +7,6 @@ plugins {
 
 e2e {
     minecraftVersion.set("1.19.4")
-    autoDownloadServer.set(true)
     acceptEula.set(true)
     testsDir.set(file("src/test/e2e"))
     downloadPlugins {

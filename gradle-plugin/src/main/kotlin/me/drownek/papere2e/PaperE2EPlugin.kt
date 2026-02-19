@@ -64,7 +64,6 @@ class PaperE2EPlugin : Plugin<Project> {
             testsDir.set(extension.testsDir)
             minecraftVersion.set(extension.minecraftVersion)
             jvmArgs.set(extension.jvmArgs)
-            autoDownloadServer.set(extension.autoDownloadServer)
             acceptEula.set(extension.acceptEula)
             pluginUrls.set(extension.pluginUrls)
 
