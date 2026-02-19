@@ -915,21 +915,23 @@ export async function runTestSession(): Promise<void> {
         }
 
         // Wait for the server to exit gracefully
-        await new Promise<void>((resolve) => {
-            const timeout = setTimeout(() => {
-                console.log('[WARNING] Server did not stop gracefully, forcing shutdown...');
-                serverProcess.kill();
-                resolve();
-            }, 30000); // 30 second timeout
+        if (serverProcess.exitCode === null) {
+            await new Promise<void>((resolve) => {
+                const timeout = setTimeout(() => {
+                    console.log('[WARNING] Server did not stop gracefully, forcing shutdown...');
+                    serverProcess.kill();
+                    resolve();
+                }, 30000); // 30 second timeout
 
-            serverProcess.once('exit', (code) => {
-                clearTimeout(timeout);
-                if (code !== 0) {
-                    console.log(`[WARNING] Server exited with code: ${code}`);
-                }
-                resolve();
+                serverProcess.once('exit', (code) => {
+                    clearTimeout(timeout);
+                    if (code !== 0) {
+                        console.log(`[WARNING] Server exited with code: ${code}`);
+                    }
+                    resolve();
+                });
             });
-        });
+        }
 
         // Clean up all listeners and streams
         serverProcess.removeAllListeners();
