@@ -542,17 +542,11 @@ async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams)
             reject(new Error('Server failed to start within 120 seconds'));
         }, 120000);
 
-        let outputBuffer = '';
-
         const dataHandler = (data: Buffer): void => {
             const output = data.toString();
-            outputBuffer += output;
             process.stdout.write(output);
 
-            if (output.includes('Done (') ||
-                output.includes('DONE') ||
-                output.includes('For help, type "help"') ||
-                outputBuffer.includes('Done (')) {
+            if (output.includes('Done (')) {
                 clearTimeout(timeout);
                 serverProcess.stdout.removeListener('data', dataHandler);
                 serverProcess.stderr.removeListener('data', stderrHandler);
@@ -562,7 +556,6 @@ async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams)
 
         const stderrHandler = (data: Buffer): void => {
             const output = data.toString();
-            outputBuffer += output;
             process.stderr.write(output);
         };
 
