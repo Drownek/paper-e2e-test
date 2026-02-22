@@ -27,11 +27,6 @@ abstract class PaperE2EExtension(project: Project) {
     val minecraftVersion: Property<String> = project.objects.property(String::class.java).convention("1.19.4")
 
     /**
-     * Whether to automatically download the Paper server if not present
-     */
-    val autoDownloadServer: Property<Boolean> = project.objects.property(Boolean::class.java).convention(true)
-
-    /**
      * JVM arguments to pass when starting the server.
      */
     val jvmArgs: ListProperty<String> = project.objects.listProperty(String::class.java).convention(

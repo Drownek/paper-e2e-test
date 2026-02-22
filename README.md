@@ -25,7 +25,6 @@ e2e {
     minecraftVersion.set("1.19.4")
     runDir.set("run")
     testsDir.set(file("src/test/e2e"))
-    autoDownloadServer.set(true)
     acceptEula.set(true)
 }
 ```
