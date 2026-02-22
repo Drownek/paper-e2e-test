@@ -37,9 +37,6 @@ abstract class TestE2ETask : DefaultTask() {
     abstract val jvmArgs: ListProperty<String>
 
     @get:Input
-    abstract val autoDownloadServer: Property<Boolean>
-
-    @get:Input
     abstract val acceptEula: Property<Boolean>
 
     @get:Input
@@ -72,7 +69,6 @@ abstract class TestE2ETask : DefaultTask() {
         val serverDirectory = serverDir.get()
         val mcVersion = minecraftVersion.get()
         val serverArgs = jvmArgs.get()
-        val shouldAutoDownload = autoDownloadServer.get()
         val shouldAcceptEula = acceptEula.get()
 
         // Create run directory if it doesn't exist
@@ -160,12 +156,8 @@ abstract class TestE2ETask : DefaultTask() {
         // Download Paper server if needed
         val serverJarFile = File(serverJar)
         if (!serverJarFile.exists()) {
-            if (shouldAutoDownload) {
-                logger.lifecycle("Server JAR not found. Downloading Paper server for Minecraft $mcVersion...")
-                downloadPaperServer(mcVersion, serverJarFile)
-            } else {
-                throw RuntimeException("Server JAR not found at $serverJar and autoDownloadServer is disabled")
-            }
+            logger.lifecycle("Server JAR not found. Downloading Paper server for Minecraft $mcVersion...")
+            downloadPaperServer(mcVersion, serverJarFile)
         }
 
         // Check tests directory
