@@ -66,6 +66,13 @@ abstract class PaperE2EExtension(project: Project) {
     val pluginUrls: ListProperty<String> = project.objects.listProperty(String::class.java).convention(emptyList())
 
     /**
+     * Whether to use only externally downloaded plugins instead of building the project plugin.
+     * When true, the testE2E task will not depend on jar/shadowJar/reobfJar tasks.
+     * Useful when running E2E tests with plugins downloaded from external sources only.
+     */
+    val useExternalPluginsOnly: Property<Boolean> = project.objects.property(Boolean::class.java).convention(false)
+
+    /**
      * DSL method for configuring plugin downloads.
      * Example:
      * ```

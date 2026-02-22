@@ -103,17 +103,20 @@ class PaperE2EPlugin : Plugin<Project> {
 
         project.afterEvaluate {
             val testTask = project.tasks.named("testE2E", TestE2ETask::class.java).get()
-            
-            // Try to find the task that produces the plugin jar
-            val jarTask = when {
-                project.tasks.findByName("shadowJar") != null -> project.tasks.named("shadowJar")
-                project.tasks.findByName("reobfJar") != null -> project.tasks.named("reobfJar")
-                else -> project.tasks.named("jar")
-            }
-            
-            if (jarTask.isPresent) {
-                testTask.dependsOn(jarTask)
-                testTask.pluginJar.set(jarTask.get().outputs.files.singleFile)
+
+            // Only set up plugin jar dependency if not using external plugins only
+            if (!extension.useExternalPluginsOnly.get()) {
+                // Try to find the task that produces the plugin jar
+                val jarTask = when {
+                    project.tasks.findByName("shadowJar") != null -> project.tasks.named("shadowJar")
+                    project.tasks.findByName("reobfJar") != null -> project.tasks.named("reobfJar")
+                    else -> project.tasks.named("jar")
+                }
+
+                if (jarTask.isPresent) {
+                    testTask.dependsOn(jarTask)
+                    testTask.pluginJar.set(jarTask.get().outputs.files.singleFile)
+                }
             }
         }
     }
