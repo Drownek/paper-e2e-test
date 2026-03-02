@@ -66,6 +66,7 @@ class PaperE2EPlugin : Plugin<Project> {
             jvmArgs.set(extension.jvmArgs)
             acceptEula.set(extension.acceptEula)
             pluginUrls.set(extension.pluginUrls)
+            runDirFiles.set(extension.runDirFiles)
 
             // Support command line properties for filtering
             if (project.hasProperty("testFiles")) {

@@ -58,6 +58,10 @@ abstract class TestE2ETask : DefaultTask() {
     @get:Input
     abstract val pluginUrls: ListProperty<String>
 
+    @get:Input
+    @get:Optional
+    abstract val runDirFiles: ListProperty<PaperE2EExtension.RunDirFile>
+
     init {
         group = "verification"
         description = "Run E2E tests for Paper plugin"
@@ -76,6 +80,29 @@ abstract class TestE2ETask : DefaultTask() {
         if (!runDirectory.exists()) {
             logger.lifecycle("Creating run directory: ${runDirectory.absolutePath}")
             runDirectory.mkdirs()
+        }
+
+        // Write staged files into the run directory
+        val filesToWrite = if (runDirFiles.isPresent) runDirFiles.get() else emptyList()
+        if (filesToWrite.isNotEmpty()) {
+            logger.lifecycle("Writing ${filesToWrite.size} staged file(s) to run directory...")
+            filesToWrite.forEach { entry ->
+                val destination = File(runDirectory, entry.path)
+                destination.parentFile?.mkdirs()
+                when {
+                    entry.content != null -> {
+                        destination.writeText(entry.content, Charsets.UTF_8)
+                        logger.lifecycle("  Wrote: ${entry.path}")
+                    }
+                    entry.sourceFile != null -> {
+                        if (!entry.sourceFile.exists()) {
+                            throw RuntimeException("Staged file source does not exist: ${entry.sourceFile.absolutePath}")
+                        }
+                        Files.copy(entry.sourceFile.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                        logger.lifecycle("  Copied: ${entry.sourceFile.name} -> ${entry.path}")
+                    }
+                }
+            }
         }
 
         // Ensure online-mode=false and connection-throttle=0 in server.properties

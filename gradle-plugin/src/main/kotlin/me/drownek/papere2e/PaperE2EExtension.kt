@@ -4,6 +4,7 @@ import org.gradle.api.Project
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
+import java.io.File
 
 abstract class PaperE2EExtension(project: Project) {
     /**
@@ -66,6 +67,64 @@ abstract class PaperE2EExtension(project: Project) {
      * Useful when running E2E tests with plugins downloaded from external sources only.
      */
     val useExternalPluginsOnly: Property<Boolean> = project.objects.property(Boolean::class.java).convention(false)
+
+    /**
+     * List of files to write into the run directory before the server starts.
+     * Internal storage — use the writeFiles { } DSL block to populate.
+     */
+    val runDirFiles: ListProperty<RunDirFile> = project.objects.listProperty(RunDirFile::class.java).convention(emptyList())
+
+    /**
+     * DSL method for staging files into the run directory before server start.
+     *
+     * Paths are relative to the run directory.
+     *
+     * Example:
+     * ```
+     * writeFiles {
+     *     // inline text content
+     *     file("plugins/Essentials/config.yml", """
+     *         ops-name-color: '&4'
+     *         nickname-prefix: '~'
+     *     """.trimIndent())
+     *
+     *     // copy from a local source file
+     *     file("plugins/MyPlugin/data.json", projectDir.resolve("test-fixtures/data.json"))
+     * }
+     * ```
+     */
+    fun writeFiles(action: RunDirFileSpec.() -> Unit) {
+        val spec = RunDirFileSpec()
+        action(spec)
+        runDirFiles.set(spec.entries)
+    }
+
+    /**
+     * Specification for run-dir file staging.
+     */
+    class RunDirFileSpec {
+        internal val entries = mutableListOf<RunDirFile>()
+
+        /** Write [content] (as UTF-8 text) to [path] relative to the run directory. */
+        fun file(path: String, content: String) {
+            entries.add(RunDirFile(path, content, null))
+        }
+
+        /** Copy [sourceFile] to [path] relative to the run directory. */
+        fun file(path: String, sourceFile: File) {
+            entries.add(RunDirFile(path, null, sourceFile))
+        }
+    }
+
+    /**
+     * Represents a single file to be written into the run directory.
+     * Exactly one of [content] or [sourceFile] will be non-null.
+     */
+    data class RunDirFile(
+        val path: String,
+        val content: String?,
+        val sourceFile: File?
+    )
 
     /**
      * DSL method for configuring plugin downloads.
