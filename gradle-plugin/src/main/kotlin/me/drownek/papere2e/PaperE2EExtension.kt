@@ -83,9 +83,8 @@ abstract class PaperE2EExtension(project: Project) {
      * ```
      * writeFiles {
      *     // inline text content
-     *     file("plugins/Essentials/config.yml", """
-     *         ops-name-color: '&4'
-     *         nickname-prefix: '~'
+     *     file("plugins/SomePlugin/config.yml", """
+     *         key: "value"
      *     """.trimIndent())
      *
      *     // copy from a local source file
