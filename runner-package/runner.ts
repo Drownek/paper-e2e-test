@@ -1,15 +1,14 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
 import mineflayer, { Bot } from 'mineflayer';
 import { readdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import { join, basename } from 'path';
 import { pathToFileURL } from 'url';
 import { ItemWrapper, GuiWrapper, createPlayerExtensions, Window, LiveGuiHandle, GuiItemLocator } from './lib/wrappers.js';
 import { Matchers } from "./lib/expect.js";
 import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
-import { extractLineNumberFromStack } from './lib/stack-trace.js';
 import { poll, sleep } from './lib/utils.js';
+import { extractSpecLocation } from "./lib/stack-trace.js";
 
 // Enable source map support for accurate TypeScript stack traces
 installSourceMapSupport();
@@ -581,16 +580,25 @@ interface TestResult {
     testName: string;
     passed: boolean;
     durationMs: number;
-    error?: string;
-    stack?: string;
-    lineNumber?: number;
-    columnNumber?: number;
+    error?: Error;
 }
 
 function formatDuration(ms: number): string {
     if (ms < 1000) return `${ms}ms`;
     const seconds = ms / 1000;
     return `${seconds.toFixed(1)}s`;
+}
+
+async function findSpecFiles(dir: string): Promise<string[]> {
+    const results: string[] = [];
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name !== 'node_modules' && entry.name !== '.git') {
+            results.push(...await findSpecFiles(join(dir, entry.name)));
+        } else if (entry.isFile() && entry.name.endsWith('.spec.js')) {
+            results.push(join(dir, entry.name));
+        }
+    }
+    return results;
 }
 
 export async function runTestSession(): Promise<void> {
@@ -623,32 +631,14 @@ export async function runTestSession(): Promise<void> {
         await waitForServerStart(serverProcess);
         console.log('Server started successfully\n');
 
-        // Check if TypeScript was compiled (dist directory exists with spec files)
-        const distDir = join(process.cwd(), 'dist');
-        const hasCompiledTests = existsSync(distDir);
-
-        let testFiles: string[] = [];
-
-        if (hasCompiledTests) {
-            // Look for compiled .spec.js files in dist directory
-            const distFiles = (await readdir(distDir))
-                .filter(file => file.endsWith('.spec.js'))
-                .map(file => join('dist', file));
-            testFiles.push(...distFiles);
-        }
-
-        // Also look for .spec.js files in the root (for pure JavaScript tests)
-        const rootFiles = (await readdir(process.cwd()))
-            .filter(file => file.endsWith('.spec.js') && !file.startsWith('dist'));
-        testFiles.push(...rootFiles);
-
+        let testFiles = await findSpecFiles(process.cwd());
         // Apply file filter if provided
         if (testFileFilter) {
             const patterns = testFileFilter.split(',').map(p => p.trim());
             console.log(`Filtering test files with patterns: ${JSON.stringify(patterns)}\n`);
             testFiles = testFiles.filter(file =>
                 patterns.some(pattern => {
-                    const fileName = file.replace(/^dist[/\\]/, '').replace(/\.spec\.js$/, '');
+                    const fileName = basename(file).replace(/\.spec\.js$/, '');
                     const matches = fileName.includes(pattern) || file.includes(pattern);
                     console.log(`  Testing ${file} (basename: ${fileName}) against pattern "${pattern}": ${matches}`);
                     return matches;
@@ -664,7 +654,7 @@ export async function runTestSession(): Promise<void> {
             testRegistry.length = 0;
             scopeStack.length = 0;
             scopeStack.push({ label: '', beforeHooks: [], afterHooks: [] });
-            await import(pathToFileURL(join(process.cwd(), file)).href);
+            await import(pathToFileURL(file).href);
 
             for (const testCase of testRegistry) {
                 // Apply test name filter if provided
@@ -766,13 +756,6 @@ export async function runTestSession(): Promise<void> {
                 } catch (error) {
                     const durationMs = Date.now() - testStartTime;
                     const errorMsg = (error as Error).message;
-                    const stack = (error as Error).stack;
-                    const location = extractLineNumberFromStack(stack, file);
-
-                    if (!location) {
-                        console.log(`[DEBUG] Could not extract line number from stack for file "${file}"`);
-                        console.log(`[DEBUG] Stack:\n${stack}`);
-                    }
 
                     console.log(`    FAILED (${formatDuration(durationMs)}): ${errorMsg}\n`);
 
@@ -781,10 +764,7 @@ export async function runTestSession(): Promise<void> {
                         testName: testCase.name,
                         passed: false,
                         durationMs,
-                        error: errorMsg,
-                        stack,
-                        lineNumber: location?.line,
-                        columnNumber: location?.column
+                        error: error as Error
                     });
                 } finally {
                     bot.removeAllListeners();
@@ -854,23 +834,23 @@ export async function runTestSession(): Promise<void> {
         console.log(`  ${''.padEnd(statusWidth)}  ${'Total'.padEnd(testWidth)}  ${formatDuration(totalDuration).padStart(durationWidth)}`);
 
         if (failed.length > 0) {
-            console.log('\nFailed Tests:');
+            console.log('\nFailed Tests:\n');
+
             for (const result of failed) {
-                const filePath = result.file.replace(/^dist[/\\]/, '').replace(/\.spec\.js$/, '.spec.ts');
-                const absolutePath = join(process.cwd(), filePath);
-
-                const lineNumber = result.lineNumber;
-                const columnNumber = result.columnNumber || 1;
-
-                const fileUrl = pathToFileURL(absolutePath).href + (lineNumber ? `:${lineNumber}:${columnNumber}` : '');
                 console.log(`  ✗ ${result.testName}`);
-                console.log(`    ${result.error}`);
-                console.log(`    ${fileUrl}`);
+
+                if (result.error) {
+                    console.log(`    ${result.error.message}`);
+                    const location = extractSpecLocation(result.error);
+                    if (location) {
+                        console.log(`    at ${location}`);
+                    }
+                }
+
+                console.log('');
             }
-            console.log('');
 
             exitCode = 1;
-
             throw new Error(`${failed.length} test(s) failed`);
         } else {
             console.log('\nAll tests passed!');
