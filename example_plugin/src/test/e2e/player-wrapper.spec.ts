@@ -28,5 +28,5 @@ test('teleport', async ({ player }) => {
 
 test('giveItem', async ({ player }) => {
     await player.giveItem('emerald', 5)
-    await expect(player).toContainItem('emerald', 5)
+    await expect(player).toContainItem('emerald', { count: 5 })
 });
