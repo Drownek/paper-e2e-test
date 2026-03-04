@@ -749,7 +749,19 @@ export async function runTestSession(): Promise<void> {
                     const player = new PlayerWrapper(bot);
                     player.setServerWrapper(server);
 
-                    await testCase.fn({ player, server });
+                    const timeoutMs = process.env.TEST_TIMEOUT ? parseInt(process.env.TEST_TIMEOUT, 10) : 30000;
+                    let timeoutHandle: ReturnType<typeof setTimeout>;
+                    const timeoutPromise = new Promise<never>((_, reject) => {
+                        timeoutHandle = setTimeout(() => {
+                            reject(new Error(`Test timed out after ${timeoutMs}ms. You can increase this by setting the TEST_TIMEOUT environment variable.`));
+                        }, timeoutMs);
+                    });
+
+                    await Promise.race([
+                        testCase.fn({ player, server }).finally(() => clearTimeout(timeoutHandle)),
+                        timeoutPromise
+                    ]);
+
                     const durationMs = Date.now() - testStartTime;
                     console.log(`    PASSED (${formatDuration(durationMs)})\n`);
                     testResults.push({ file, testName: testCase.name, passed: true, durationMs });
