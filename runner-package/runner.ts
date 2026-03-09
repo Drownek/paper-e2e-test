@@ -9,9 +9,19 @@ import { randomUUID } from "node:crypto";
 import { install as installSourceMapSupport } from 'source-map-support';
 import { poll, sleep } from './lib/utils.js';
 import { extractSpecLocation } from "./lib/stack-trace.js";
+import pc from 'picocolors';
 
 // Enable source map support for accurate TypeScript stack traces
 installSourceMapSupport();
+
+function writeMcOutput(data: Buffer): void {
+    const text = data.toString().replace(/\r\n/g, '\n');
+    const prefixed = text
+        .split('\n')
+        .map(line => line.length > 0 ? `${pc.gray('[MC]')} ${line}` : '')
+        .join('\n');
+    process.stdout.write(prefixed);
+}
 
 export { ItemWrapper, GuiWrapper };
 
@@ -431,7 +441,7 @@ export class PlayerWrapper {
     }
 
     chat(message: string): void {
-        console.log(`[Bot] Chatting: ${message}`);
+        console.log(`${pc.cyan('[Bot]')} ${pc.dim(`Chatting: ${message}`)}`);
         this.bot.chat(message);
     }
 
@@ -544,7 +554,7 @@ async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams)
 
         const dataHandler = (data: Buffer): void => {
             const output = data.toString();
-            process.stdout.write(output);
+            writeMcOutput(data);
 
             if (output.includes('Done (')) {
                 clearTimeout(timeout);
@@ -555,8 +565,7 @@ async function waitForServerStart(serverProcess: ChildProcessWithoutNullStreams)
         };
 
         const stderrHandler = (data: Buffer): void => {
-            const output = data.toString();
-            process.stderr.write(output);
+            writeMcOutput(data);
         };
 
         serverProcess.stdout.on('data', dataHandler);
@@ -616,12 +625,12 @@ export async function runTestSession(): Promise<void> {
 
     let exitCode = 0;
 
-    console.log('\nStarting Paper server...');
+    console.log(`\n${pc.bold('Starting Paper server...')}`);
 
     const jvmArgsString = process.env.JVM_ARGS || '';
     const jvmArgs = jvmArgsString.split(' ').filter(arg => arg.trim() !== '');
 
-    console.log(`JVM Arguments: ${jvmArgs.join(' ')}`);
+    console.log(pc.dim(`JVM Arguments: ${jvmArgs.join(' ')}`));
 
     const serverProcess = spawn(javaPath!, [...jvmArgs, '-jar', serverJar, '--nogui'], {
         cwd: serverDir,
@@ -630,27 +639,29 @@ export async function runTestSession(): Promise<void> {
 
     try {
         await waitForServerStart(serverProcess);
-        console.log('Server started successfully\n');
+        console.log(`${pc.green(pc.bold('Server started successfully'))}\n`);
+
+        serverProcess.stdout.on('data', writeMcOutput);
+        serverProcess.stderr.on('data', writeMcOutput);
 
         let testFiles = await findSpecFiles(process.cwd());
-        // Apply file filter if provided
         if (testFileFilter) {
             const patterns = testFileFilter.split(',').map(p => p.trim());
-            console.log(`Filtering test files with patterns: ${JSON.stringify(patterns)}\n`);
+            console.log(`${pc.dim(`Filtering test files with patterns: ${JSON.stringify(patterns)}`)}\n`);
             testFiles = testFiles.filter(file =>
                 patterns.some(pattern => {
                     const fileName = basename(file).replace(/\.spec\.js$/, '');
                     const matches = fileName.includes(pattern) || file.includes(pattern);
-                    console.log(`  Testing ${file} (basename: ${fileName}) against pattern "${pattern}": ${matches}`);
+                    console.log(pc.dim(`  Testing ${file} (basename: ${fileName}) against pattern "${pattern}": ${matches}`));
                     return matches;
                 })
             );
         }
 
-        console.log(`Found ${testFiles.length} test file(s)${testFileFilter ? ` matching filter: ${testFileFilter}` : ''}\n`);
+        console.log(`${pc.bold(`Found ${testFiles.length} test file(s)${testFileFilter ? ` matching filter: ${testFileFilter}` : ''}`)}\n`);
 
         for (const file of testFiles) {
-            console.log(`\nRunning tests from: ${file}`);
+            console.log(`\n${pc.blue(pc.bold(`Running tests from: ${file}`))}`);
 
             testRegistry.length = 0;
             scopeStack.length = 0;
@@ -658,23 +669,22 @@ export async function runTestSession(): Promise<void> {
             await import(pathToFileURL(file).href);
 
             for (const testCase of testRegistry) {
-                // Apply test name filter if provided
                 if (testNameFilter) {
                     const patterns = testNameFilter.split(',').map(p => p.trim());
                     const matches = patterns.some(pattern => testCase.name.includes(pattern));
                     if (!matches) {
-                        console.log(`  Test: ${testCase.name} - SKIPPED (filter: ${testNameFilter})`);
+                        console.log(pc.dim(`  Test: ${testCase.name} - SKIPPED (filter: ${testNameFilter})`));
                         continue;
                     }
                 }
 
-                console.log(`  Test: ${testCase.name}`);
+                console.log(`  ${pc.bold(`Test: ${testCase.name}`)}`);
 
                 messageBuffer.length = 0;
 
                 const server: ServerWrapper = {
                     execute: (cmd: string) => {
-                        console.log(`[Server] Executing: ${cmd}`);
+                        console.log(`${pc.yellow('[Server]')} ${pc.dim(`Executing: ${cmd}`)}`);
                         serverProcess.stdin.write(cmd + '\n', (err) => {
                             if (err) console.error(`[Server] Write error: ${err}`);
                         });
@@ -684,7 +694,7 @@ export async function runTestSession(): Promise<void> {
                 const createPlayer = async (options?: { username?: string }): Promise<PlayerWrapper> => {
                     const uniqueId = randomUUID().split('-')[0];
                     const botUsername = options?.username || `Test_${uniqueId}`;
-                    console.log(`[Bot] Creating bot: ${botUsername}`);
+                    console.log(`${pc.cyan('[Bot]')} Creating bot: ${pc.bold(botUsername)}`);
 
                     const bot = mineflayer.createBot({
                         host: 'localhost',
@@ -702,46 +712,46 @@ export async function runTestSession(): Promise<void> {
                         }, 10000);
 
                         bot.once('spawn', () => {
-                            console.log(`[Bot] ${botUsername} spawned successfully`);
+                            console.log(`${pc.cyan('[Bot]')} ${pc.dim(`${botUsername} spawned successfully`)}`);
                             clearTimeout(timeout);
                             resolve();
                         });
 
                         bot.once('error', (err: Error) => {
-                            console.log(`[Bot] ${botUsername} connection error: ${err.message}`);
+                            console.log(pc.red(`[Bot] ${botUsername} connection error: ${err.message}`));
                             clearTimeout(timeout);
                             reject(err);
                         });
 
                         bot.once('kicked', (reason: string) => {
-                            console.log(`[Bot] ${botUsername} kicked: ${reason}`);
+                            console.log(pc.red(`[Bot] ${botUsername} kicked: ${reason}`));
                             clearTimeout(timeout);
                             reject(new Error(`Bot ${botUsername} was kicked: ${reason}`));
                         });
 
                         bot.once('end', (reason: string) => {
-                            console.log(`[Bot] ${botUsername} connection ended: ${reason}`);
+                            console.log(pc.dim(`[Bot] ${botUsername} connection ended: ${reason}`));
                         });
                     });
 
                     bot.on('message', (jsonMsg: unknown) => {
                         const message = String(jsonMsg);
-                        console.log(`[Bot ${botUsername}] Received message: "${message}"`);
+                        console.log(pc.dim(`[Bot ${botUsername}] Received message: "${message}"`));
                         messageBuffer.push(message);
                     });
 
                     bot.on('windowOpen', (window: unknown) => {
                         const win = window as { title?: string; type?: string | number; slots?: unknown[] };
-                        console.log(`[DEBUG] [Bot ${botUsername}] Global windowOpen event - Title: "${win.title}", Type: ${win.type}, SlotCount: ${win.slots?.length}`);
+                        console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] Global windowOpen event - Title: "${win.title}", Type: ${win.type}, SlotCount: ${win.slots?.length}`));
                     });
 
                     bot.on('windowClose', (window: unknown) => {
                         const win = window as { title?: string };
-                        console.log(`[DEBUG] [Bot ${botUsername}] windowClose event - Window: ${win?.title || 'unknown'}`);
+                        console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] windowClose event - Window: ${win?.title || 'unknown'}`));
                     });
 
                     (bot as Bot & { _client: EventEmitterLike })._client.on('open_window', (packet: unknown) => {
-                        console.log(`[DEBUG] [Bot ${botUsername}] Raw open_window packet:`, JSON.stringify(packet));
+                        console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] Raw open_window packet: ${JSON.stringify(packet)}`));
                     });
 
                     const player = new PlayerWrapper(bot);
@@ -769,13 +779,13 @@ export async function runTestSession(): Promise<void> {
                     ]);
 
                     const durationMs = Date.now() - testStartTime;
-                    console.log(`    PASSED (${formatDuration(durationMs)})\n`);
+                    console.log(`    ${pc.green(pc.bold('PASSED'))} ${pc.dim(`(${formatDuration(durationMs)})`)}\n`);
                     testResults.push({ file, testName: testCase.name, passed: true, durationMs });
                 } catch (error) {
                     const durationMs = Date.now() - testStartTime;
                     const errorMsg = (error as Error).message;
 
-                    console.log(`    FAILED (${formatDuration(durationMs)}): ${errorMsg}\n`);
+                    console.log(`    ${pc.red(pc.bold('FAILED'))} ${pc.dim(`(${formatDuration(durationMs)})`)}: ${pc.red(errorMsg)}\n`);
 
                     testResults.push({
                         file,
@@ -792,7 +802,7 @@ export async function runTestSession(): Promise<void> {
                     await Promise.all(activeBots.map(b => {
                         return new Promise<void>((resolve) => {
                             const timeout = setTimeout(() => {
-                                console.log(`[WARNING] Bot ${b.username} disconnect timeout, continuing anyway`);
+                                console.log(pc.yellow(`[WARNING] Bot ${b.username} disconnect timeout, continuing anyway`));
                                 resolve();
                             }, 2000);
 
@@ -816,21 +826,20 @@ export async function runTestSession(): Promise<void> {
             }
         }
 
-        console.log('\n========================================');
-        console.log('Test Summary');
-        console.log('========================================');
+        console.log(`\n${pc.bold('═'.repeat(40))}`);
+        console.log(pc.bold('  Test Summary'));
+        console.log(pc.bold('═'.repeat(40)));
 
         const passed = testResults.filter(r => r.passed);
         const failed = testResults.filter(r => !r.passed);
 
         const totalDuration = testResults.reduce((sum, r) => sum + r.durationMs, 0);
 
-        console.log(`Total: ${testResults.length}`);
-        console.log(`Passed: ${passed.length}`);
-        console.log(`Failed: ${failed.length}`);
-        console.log(`Duration: ${formatDuration(totalDuration)}`);
+        console.log(`  Total:    ${pc.bold(String(testResults.length))}`);
+        console.log(`  Passed:   ${pc.green(pc.bold(String(passed.length)))}`);
+        console.log(`  Failed:   ${failed.length > 0 ? pc.red(pc.bold(String(failed.length))) : pc.dim(String(failed.length))}`);
+        console.log(`  Duration: ${pc.dim(formatDuration(totalDuration))}`);
 
-        // Duration table
         const statusCol = 'Status';
         const testCol = 'Test';
         const durationCol = 'Duration';
@@ -839,32 +848,36 @@ export async function runTestSession(): Promise<void> {
         const durationWidth = Math.max(durationCol.length, ...testResults.map(r => formatDuration(r.durationMs).length));
         const testWidth = Math.max(testCol.length, ...testResults.map(r => r.testName.length));
 
-        const header = `  ${statusCol.padEnd(statusWidth)}  ${testCol.padEnd(testWidth)}  ${durationCol.padStart(durationWidth)}`;
-        const separator = `  ${'─'.repeat(statusWidth)}  ${'─'.repeat(testWidth)}  ${'─'.repeat(durationWidth)}`;
+        const header = `  ${pc.dim(`${statusCol.padEnd(statusWidth)}  ${testCol.padEnd(testWidth)}  ${durationCol.padStart(durationWidth)}`)}`;
+        const separator = `  ${pc.dim(`${'─'.repeat(statusWidth)}  ${'─'.repeat(testWidth)}  ${'─'.repeat(durationWidth)}`)}`;
 
         console.log(`\n${header}`);
         console.log(separator);
 
         for (const result of testResults) {
             const status = result.passed ? 'PASS' : 'FAIL';
+            const statusPadded = status.padEnd(statusWidth);
+            const coloredStatus = result.passed
+                ? pc.green(pc.bold(statusPadded))
+                : pc.red(pc.bold(statusPadded));
             const duration = formatDuration(result.durationMs);
-            console.log(`  ${status.padEnd(statusWidth)}  ${result.testName.padEnd(testWidth)}  ${duration.padStart(durationWidth)}`);
+            console.log(`  ${coloredStatus}  ${result.testName.padEnd(testWidth)}  ${pc.dim(duration.padStart(durationWidth))}`);
         }
 
         console.log(separator);
-        console.log(`  ${''.padEnd(statusWidth)}  ${'Total'.padEnd(testWidth)}  ${formatDuration(totalDuration).padStart(durationWidth)}`);
+        console.log(`  ${''.padEnd(statusWidth)}  ${pc.bold('Total'.padEnd(testWidth))}  ${pc.dim(formatDuration(totalDuration).padStart(durationWidth))}`);
 
         if (failed.length > 0) {
-            console.log('\nFailed Tests:\n');
+            console.log(`\n${pc.red(pc.bold('Failed Tests:'))}\n`);
 
             for (const result of failed) {
-                console.log(`  ✗ ${result.testName}`);
+                console.log(`  ${pc.red(`✗ ${result.testName}`)}`);
 
                 if (result.error) {
-                    console.log(`    ${result.error.message}`);
+                    console.log(`    ${pc.red(result.error.message)}`);
                     const location = extractSpecLocation(result.error);
                     if (location) {
-                        console.log(`    at ${location}`);
+                        console.log(`    ${pc.dim(`at ${location}`)}`);
                     }
                 }
 
@@ -874,13 +887,13 @@ export async function runTestSession(): Promise<void> {
             exitCode = 1;
             throw new Error(`${failed.length} test(s) failed`);
         } else {
-            console.log('\nAll tests passed!');
+            console.log(`\n${pc.green(pc.bold('All tests passed!'))}`);
         }
     } finally {
         await Promise.all(activeBots.map(bot => {
             return new Promise<void>((resolve) => {
                 const timeout = setTimeout(() => {
-                    console.log(`[WARNING] Bot ${bot.username} cleanup timeout, forcing end`);
+                    console.log(pc.yellow(`[WARNING] Bot ${bot.username} cleanup timeout, forcing end`));
                     resolve();
                 }, 2000);
 
@@ -899,39 +912,35 @@ export async function runTestSession(): Promise<void> {
         }));
         activeBots.length = 0;
 
-        // Check if server is still running before attempting to write
         if (serverProcess.exitCode === null && !serverProcess.killed) {
             try {
                 serverProcess.stdin.write('stop\n');
             } catch (err) {
-                console.log('[WARNING] Failed to send stop command to server:', (err as Error).message);
+                console.log(pc.yellow(`[WARNING] Failed to send stop command to server: ${(err as Error).message}`));
             }
         }
 
-        // Wait for the server to exit gracefully
         await new Promise<void>((resolve) => {
             const timeout = setTimeout(() => {
-                console.log('[WARNING] Server did not stop gracefully, forcing shutdown...');
+                console.log(pc.yellow('[WARNING] Server did not stop gracefully, forcing shutdown...'));
                 serverProcess.kill();
                 resolve();
-            }, 30000); // 30 second timeout
+            }, 30000);
 
             serverProcess.once('exit', (code) => {
                 clearTimeout(timeout);
                 if (code !== 0) {
-                    console.log(`[WARNING] Server exited with code: ${code}`);
+                    console.log(pc.yellow(`[WARNING] Server exited with code: ${code}`));
                 }
                 resolve();
             });
         });
 
-        // Clean up all listeners and streams
         serverProcess.removeAllListeners();
         serverProcess.stdin.end();
         serverProcess.stdout.destroy();
         serverProcess.stderr.destroy();
 
-        // Safety net
         setTimeout(() => {
             process.exit(exitCode);
         }, 1000).unref();
