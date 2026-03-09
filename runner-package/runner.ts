@@ -18,6 +18,7 @@ export { ItemWrapper, GuiWrapper };
 export interface TestContext {
     player: PlayerWrapper;
     server: ServerWrapper;
+    createPlayer: (options?: { username?: string }) => Promise<PlayerWrapper>;
 }
 
 export interface ServerWrapper {
@@ -671,84 +672,89 @@ export async function runTestSession(): Promise<void> {
 
                 messageBuffer.length = 0;
 
-                const uniqueId = randomUUID().split('-')[0];
-                const botUsername = `Test_${uniqueId}`;
-                console.log(`[Bot] Creating bot: ${botUsername}`);
+                const server: ServerWrapper = {
+                    execute: (cmd: string) => {
+                        console.log(`[Server] Executing: ${cmd}`);
+                        serverProcess.stdin.write(cmd + '\n', (err) => {
+                            if (err) console.error(`[Server] Write error: ${err}`);
+                        });
+                    }
+                };
 
-                const bot = mineflayer.createBot({
-                    host: 'localhost',
-                    port: 25565,
-                    username: botUsername,
-                    version: process.env.MC_VERSION,
-                    auth: 'offline'
-                });
+                const createPlayer = async (options?: { username?: string }): Promise<PlayerWrapper> => {
+                    const uniqueId = randomUUID().split('-')[0];
+                    const botUsername = options?.username || `Test_${uniqueId}`;
+                    console.log(`[Bot] Creating bot: ${botUsername}`);
 
-                currentPlayer = bot;
-                activeBots.push(bot);
-
-                await new Promise<void>((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        reject(new Error('Bot failed to spawn within 10 seconds'));
-                    }, 10000);
-
-                    bot.once('spawn', () => {
-                        console.log(`[Bot] ${botUsername} spawned successfully`);
-                        clearTimeout(timeout);
-                        resolve();
+                    const bot = mineflayer.createBot({
+                        host: 'localhost',
+                        port: 25565,
+                        username: botUsername,
+                        version: process.env.MC_VERSION,
+                        auth: 'offline'
                     });
 
-                    bot.once('error', (err: Error) => {
-                        console.log(`[Bot] Connection error: ${err.message}`);
-                        clearTimeout(timeout);
-                        reject(err);
+                    activeBots.push(bot);
+
+                    await new Promise<void>((resolve, reject) => {
+                        const timeout = setTimeout(() => {
+                            reject(new Error(`Bot ${botUsername} failed to spawn within 10 seconds`));
+                        }, 10000);
+
+                        bot.once('spawn', () => {
+                            console.log(`[Bot] ${botUsername} spawned successfully`);
+                            clearTimeout(timeout);
+                            resolve();
+                        });
+
+                        bot.once('error', (err: Error) => {
+                            console.log(`[Bot] ${botUsername} connection error: ${err.message}`);
+                            clearTimeout(timeout);
+                            reject(err);
+                        });
+
+                        bot.once('kicked', (reason: string) => {
+                            console.log(`[Bot] ${botUsername} kicked: ${reason}`);
+                            clearTimeout(timeout);
+                            reject(new Error(`Bot ${botUsername} was kicked: ${reason}`));
+                        });
+
+                        bot.once('end', (reason: string) => {
+                            console.log(`[Bot] ${botUsername} connection ended: ${reason}`);
+                        });
                     });
 
-                    bot.once('kicked', (reason: string) => {
-                        console.log(`[Bot] Kicked: ${reason}`);
-                        clearTimeout(timeout);
-                        reject(new Error(`Bot was kicked: ${reason}`));
+                    bot.on('message', (jsonMsg: unknown) => {
+                        const message = String(jsonMsg);
+                        console.log(`[Bot ${botUsername}] Received message: "${message}"`);
+                        messageBuffer.push(message);
                     });
 
-                    bot.once('end', (reason: string) => {
-                        console.log(`[Bot] Connection ended: ${reason}`);
+                    bot.on('windowOpen', (window: unknown) => {
+                        const win = window as { title?: string; type?: string | number; slots?: unknown[] };
+                        console.log(`[DEBUG] [Bot ${botUsername}] Global windowOpen event - Title: "${win.title}", Type: ${win.type}, SlotCount: ${win.slots?.length}`);
                     });
-                });
 
-                bot.on('message', (jsonMsg: unknown) => {
-                    const message = String(jsonMsg);
-                    console.log(`[Bot] Received message: "${message}"`);
-                    messageBuffer.push(message);
-                });
+                    bot.on('windowClose', (window: unknown) => {
+                        const win = window as { title?: string };
+                        console.log(`[DEBUG] [Bot ${botUsername}] windowClose event - Window: ${win?.title || 'unknown'}`);
+                    });
 
-                bot.on('windowOpen', (window: unknown) => {
-                    const win = window as { title?: string; type?: string | number; slots?: unknown[] };
-                    console.log(`[DEBUG] Global windowOpen event - Title: "${win.title}", Type: ${win.type}, SlotCount: ${win.slots?.length}`);
-                });
+                    (bot as Bot & { _client: EventEmitterLike })._client.on('open_window', (packet: unknown) => {
+                        console.log(`[DEBUG] [Bot ${botUsername}] Raw open_window packet:`, JSON.stringify(packet));
+                    });
 
-                bot.on('windowClose', (window: unknown) => {
-                    const win = window as { title?: string };
-                    console.log(`[DEBUG] windowClose event - Window: ${win?.title || 'unknown'}`);
-                });
+                    const player = new PlayerWrapper(bot);
+                    player.setServerWrapper(server);
+                    return player;
+                };
 
-                (bot as Bot & { _client: EventEmitterLike })._client.on('open_window', (packet: unknown) => {
-                    console.log(`[DEBUG] Raw open_window packet:`, JSON.stringify(packet));
-                });
+                const player = await createPlayer();
+                currentPlayer = player.bot;
 
                 const testStartTime = Date.now();
 
                 try {
-                    const server: ServerWrapper = {
-                        execute: (cmd: string) => {
-                            console.log(`[Server] Executing: ${cmd}`);
-                            serverProcess.stdin.write(cmd + '\n', (err) => {
-                                if (err) console.error(`[Server] Write error: ${err}`);
-                            });
-                        }
-                    };
-
-                    const player = new PlayerWrapper(bot);
-                    player.setServerWrapper(server);
-
                     const timeoutMs = process.env.TEST_TIMEOUT ? parseInt(process.env.TEST_TIMEOUT, 10) : 30000;
                     let timeoutHandle: ReturnType<typeof setTimeout>;
                     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -758,7 +764,7 @@ export async function runTestSession(): Promise<void> {
                     });
 
                     await Promise.race([
-                        testCase.fn({ player, server }).finally(() => clearTimeout(timeoutHandle)),
+                        testCase.fn({ player, server, createPlayer }).finally(() => clearTimeout(timeoutHandle)),
                         timeoutPromise
                     ]);
 
@@ -779,30 +785,33 @@ export async function runTestSession(): Promise<void> {
                         error: error as Error
                     });
                 } finally {
-                    bot.removeAllListeners();
+                    for (const b of activeBots) {
+                        b.removeAllListeners();
+                    }
 
-                    await new Promise<void>((resolve) => {
-                        const timeout = setTimeout(() => {
-                            console.log(`[WARNING] Bot ${bot.username} disconnect timeout, continuing anyway`);
-                            resolve();
-                        }, 2000);
+                    await Promise.all(activeBots.map(b => {
+                        return new Promise<void>((resolve) => {
+                            const timeout = setTimeout(() => {
+                                console.log(`[WARNING] Bot ${b.username} disconnect timeout, continuing anyway`);
+                                resolve();
+                            }, 2000);
 
-                        bot.once('end', () => {
-                            clearTimeout(timeout);
-                            resolve();
+                            b.once('end', () => {
+                                clearTimeout(timeout);
+                                resolve();
+                            });
+
+                            try {
+                                b.quit();
+                            } catch (err) {
+                                clearTimeout(timeout);
+                                resolve();
+                            }
                         });
-
-                        try {
-                            bot.quit();
-                        } catch (err) {
-                            clearTimeout(timeout);
-                            resolve();
-                        }
-                    });
+                    }));
 
                     currentPlayer = null;
-                    const index = activeBots.indexOf(bot);
-                    if (index > -1) activeBots.splice(index, 1);
+                    activeBots.length = 0;
                 }
             }
         }
