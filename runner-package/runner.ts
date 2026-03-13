@@ -826,6 +826,61 @@ export async function runTestSession(): Promise<void> {
             }
         }
 
+    } finally {
+        // Disconnect all bots
+        await Promise.all(activeBots.map(bot => {
+            return new Promise<void>((resolve) => {
+                const timeout = setTimeout(() => {
+                    console.log(pc.yellow(`[WARNING] Bot ${bot.username} cleanup timeout, forcing end`));
+                    resolve();
+                }, 2000);
+
+                bot.once('end', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                });
+
+                try {
+                    bot.quit();
+                } catch (err) {
+                    clearTimeout(timeout);
+                    resolve();
+                }
+            });
+        }));
+        activeBots.length = 0;
+
+        // Stop the server
+        if (serverProcess.exitCode === null && !serverProcess.killed) {
+            try {
+                serverProcess.stdin.write('stop\n');
+            } catch (err) {
+                console.log(pc.yellow(`[WARNING] Failed to send stop command to server: ${(err as Error).message}`));
+            }
+        }
+
+        await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+                console.log(pc.yellow('[WARNING] Server did not stop gracefully, forcing shutdown...'));
+                serverProcess.kill();
+                resolve();
+            }, 30000);
+
+            serverProcess.once('exit', (code) => {
+                clearTimeout(timeout);
+                if (code !== 0) {
+                    console.log(pc.yellow(`[WARNING] Server exited with code: ${code}`));
+                }
+                resolve();
+            });
+        });
+
+        serverProcess.removeAllListeners();
+        serverProcess.stdin.end();
+        serverProcess.stdout.destroy();
+        serverProcess.stderr.destroy();
+
+        // Display test results
         console.log(`\n${pc.bold('═'.repeat(40))}`);
         console.log(pc.bold('  Test Summary'));
         console.log(pc.bold('═'.repeat(40)));
@@ -885,61 +940,9 @@ export async function runTestSession(): Promise<void> {
             }
 
             exitCode = 1;
-            throw new Error(`${failed.length} test(s) failed`);
         } else {
             console.log(`\n${pc.green(pc.bold('All tests passed!'))}`);
         }
-    } finally {
-        await Promise.all(activeBots.map(bot => {
-            return new Promise<void>((resolve) => {
-                const timeout = setTimeout(() => {
-                    console.log(pc.yellow(`[WARNING] Bot ${bot.username} cleanup timeout, forcing end`));
-                    resolve();
-                }, 2000);
-
-                bot.once('end', () => {
-                    clearTimeout(timeout);
-                    resolve();
-                });
-
-                try {
-                    bot.quit();
-                } catch (err) {
-                    clearTimeout(timeout);
-                    resolve();
-                }
-            });
-        }));
-        activeBots.length = 0;
-
-        if (serverProcess.exitCode === null && !serverProcess.killed) {
-            try {
-                serverProcess.stdin.write('stop\n');
-            } catch (err) {
-                console.log(pc.yellow(`[WARNING] Failed to send stop command to server: ${(err as Error).message}`));
-            }
-        }
-
-        await new Promise<void>((resolve) => {
-            const timeout = setTimeout(() => {
-                console.log(pc.yellow('[WARNING] Server did not stop gracefully, forcing shutdown...'));
-                serverProcess.kill();
-                resolve();
-            }, 30000);
-
-            serverProcess.once('exit', (code) => {
-                clearTimeout(timeout);
-                if (code !== 0) {
-                    console.log(pc.yellow(`[WARNING] Server exited with code: ${code}`));
-                }
-                resolve();
-            });
-        });
-
-        serverProcess.removeAllListeners();
-        serverProcess.stdin.end();
-        serverProcess.stdout.destroy();
-        serverProcess.stderr.destroy();
 
         setTimeout(() => {
             process.exit(exitCode);
