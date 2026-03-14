@@ -24,3 +24,8 @@ test('help displays message', async ({ player, server }) => {
   player.chat('/help');
   await expect(player).toHaveReceivedMessage('Help');
 });
+
+test('server logs command execution', async ({ server }) => {
+  server.execute('say hello');
+  await expect(server).toHaveReceivedMessage('hello');
+});

@@ -16,8 +16,13 @@ installSourceMapSupport();
 
 function writeMcOutput(data: Buffer): void {
     const text = data.toString().replace(/\r\n/g, '\n');
-    const prefixed = text
-        .split('\n')
+    const lines = text.split('\n');
+    for (const line of lines) {
+        if (line.length > 0) {
+            serverConsoleBuffer.push(line);
+        }
+    }
+    const prefixed = lines
         .map(line => line.length > 0 ? `${pc.gray('[MC]')} ${line}` : '')
         .join('\n');
     process.stdout.write(prefixed);
@@ -31,8 +36,12 @@ export interface TestContext {
     createPlayer: (options?: { username?: string }) => Promise<PlayerWrapper>;
 }
 
-export interface ServerWrapper {
+export class ServerWrapper {
     execute: (cmd: string) => void;
+
+    constructor(executeFn: (cmd: string) => void) {
+        this.execute = executeFn;
+    }
 }
 
 interface TestCase {
@@ -58,6 +67,7 @@ const testRegistry: TestCase[] = [];
 const scopeStack: DescribeScope[] = [{ label: '', beforeHooks: [], afterHooks: [] }];
 let currentPlayer: Bot | null = null;
 let messageBuffer: string[] = [];
+let serverConsoleBuffer: string[] = [];
 const activeBots: Bot[] = [];
 
 export function test(name: string, fn: (context: TestContext) => Promise<void>): void {
@@ -140,7 +150,7 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
     }
 
     async toHaveReceivedMessage(
-        this: RunnerMatchers<PlayerWrapper>,
+        this: RunnerMatchers<PlayerWrapper | ServerWrapper>,
         expectedMessage: string | RegExp,
         options: { strict?: boolean; timeout?: number; pollingRate?: number } = {}
     ): Promise<void> {
@@ -150,9 +160,11 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
             return strict ? msg === expectedMessage : msg.includes(expectedMessage);
         };
 
+        const buffer = this.actual instanceof PlayerWrapper ? messageBuffer : serverConsoleBuffer;
+
         await this.pollAssertion(
-            () => messageBuffer.some(isMatch),
-            () => `Expected NOT to receive message matching "${expectedMessage}", but received: "${messageBuffer.find(isMatch)}"`,
+            () => buffer.some(isMatch),
+            () => `Expected NOT to receive message matching "${expectedMessage}", but received: "${buffer.find(isMatch)}"`,
             () => `Expected message matching "${expectedMessage}" not received`,
             { timeout, pollingRate }
         );
@@ -681,15 +693,14 @@ export async function runTestSession(): Promise<void> {
                 console.log(`  ${pc.bold(`Test: ${testCase.name}`)}`);
 
                 messageBuffer.length = 0;
+                serverConsoleBuffer.length = 0;
 
-                const server: ServerWrapper = {
-                    execute: (cmd: string) => {
-                        console.log(`${pc.yellow('[Server]')} ${pc.dim(`Executing: ${cmd}`)}`);
-                        serverProcess.stdin.write(cmd + '\n', (err) => {
-                            if (err) console.error(`[Server] Write error: ${err}`);
-                        });
-                    }
-                };
+                const server = new ServerWrapper((cmd: string) => {
+                    console.log(`${pc.yellow('[Server]')} ${pc.dim(`Executing: ${cmd}`)}`);
+                    serverProcess.stdin.write(cmd + '\n', (err) => {
+                        if (err) console.error(`[Server] Write error: ${err}`);
+                    });
+                });
 
                 const createPlayer = async (options?: { username?: string }): Promise<PlayerWrapper> => {
                     const uniqueId = randomUUID().split('-')[0];
