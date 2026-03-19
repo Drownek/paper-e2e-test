@@ -131,6 +131,40 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
         super(actual, isNot);
     }
 
+    /**
+     * Unwraps a rejected Promise so subsequent matchers run against the error.
+     * Usage: await expect(promise).rejects.toThrow('message')
+     */
+    get rejects() {
+        return {
+            toThrow: async (expected?: string | RegExp) => {
+                try {
+                    await (this.actual as Promise<any>);
+                } catch (err: any) {
+                    // Promise rejected - this is the success path
+                    if (expected === undefined) return;
+                    const msg = err?.message ?? String(err);
+                    if (typeof expected === 'string') {
+                        this._assert(
+                            msg.includes(expected),
+                            `Expected rejection not to include "${expected}", but got "${msg}"`,
+                            `Expected rejection to include "${expected}", but got "${msg}"`
+                        );
+                    } else {
+                        this._assert(
+                            expected.test(msg),
+                            `Expected rejection not to match ${expected}, but got "${msg}"`,
+                            `Expected rejection to match ${expected}, but got "${msg}"`
+                        );
+                    }
+                    return;
+                }
+                // Promise resolved - fail
+                this._assert(false, 'Expected promise to resolve, but it rejected', 'Expected promise to reject, but it resolved');
+            }
+        };
+    }
+
     protected async pollAssertion(
         condition: () => boolean,
         passMessage: () => string,
