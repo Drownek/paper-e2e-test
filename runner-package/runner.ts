@@ -52,6 +52,7 @@ interface TestCase {
 interface EventEmitterLike {
     on(event: string, listener: (...args: unknown[]) => void): void;
     removeListener(event: string, listener: (...args: unknown[]) => void): void;
+    removeAllListeners(event?: string): void;
 }
 
 
@@ -417,6 +418,39 @@ export const expect: ExpectFunction = Object.assign(
     }
 );
 
+/**
+ * Disconnects a bot, waiting for the `end` event or a timeout.
+ * Cleans up all listeners BEFORE registering end handler so it isn't stripped.
+ * Skips the wait entirely if the client is already ended.
+ */
+function disconnectBot(bot: Bot, label: string, timeoutMs: number = 3000): Promise<void> {
+    const isAlreadyEnded = !!(bot as any)._client?.ended;
+    if (isAlreadyEnded) {
+        bot.removeAllListeners();
+        return Promise.resolve();
+    }
+
+    return new Promise<void>((resolve) => {
+        const timeout = setTimeout(() => {
+            console.log(pc.dim(`[Bot] ${label} disconnect timeout, continuing`));
+            resolve();
+        }, timeoutMs);
+
+        try {
+            bot.removeAllListeners();
+            bot.once('end', () => {
+                clearTimeout(timeout);
+                resolve();
+            });
+            bot.quit();
+        } catch (err) {
+            console.log(pc.dim(`[Bot] ${label} error during disconnect: ${(err as Error).message}`));
+            clearTimeout(timeout);
+            resolve();
+        }
+    });
+}
+
 export class PlayerWrapper {
     bot: Bot;
     inventory: Bot['inventory'];
@@ -432,7 +466,7 @@ export class PlayerWrapper {
      * // New (recommended):
      * const gui = await player.gui({ title: /Activity/ });
      */
-    waitForGui: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<GuiWrapper>;
+    waitForGui!: (guiMatcher: (gui: GuiWrapper) => boolean, options?: { timeout?: number }) => Promise<GuiWrapper>;
 
     /**
      * @deprecated Use `gui.locator(predicate)` with expectations instead. This method will be removed in a future version.
@@ -446,7 +480,7 @@ export class PlayerWrapper {
      * const item = gui.locator(i => i.name.includes('clock'));
      * await expect(item).toHaveLore('some text');
      */
-    waitForGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<ItemWrapper>;
+    waitForGuiItem!: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<ItemWrapper>;
 
     /**
      * @deprecated Use `gui.locator(predicate).click()` instead. This method will be removed in a future version.
@@ -460,21 +494,130 @@ export class PlayerWrapper {
      * const item = gui.locator(i => i.name.includes('clock'));
      * await item.click();
      */
-    clickGuiItem: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<void>;
+    clickGuiItem!: (itemMatcher: (item: ItemWrapper) => boolean, options?: { timeout?: number, pollingRate?: number }) => Promise<void>;
 
-    gui: (options: { title: string | RegExp; timeout?: number }) => Promise<LiveGuiHandle>;
+    gui!: (options: { title: string | RegExp; timeout?: number }) => Promise<LiveGuiHandle>;
     private serverWrapper?: ServerWrapper;
+    private _botOptions?: { host: string; port: number; version: string | undefined; auth: 'mojang' | 'microsoft' | 'offline' };
+    private _spawnPromise: Promise<void> | null = null;
+    private _listenersBot: Bot | null = null;
 
     constructor(bot: Bot) {
         this.bot = bot;
         this.inventory = bot.inventory;
         this.username = bot.username;
+        this._bindExtensions(bot);
+    }
 
+    /**
+     * Binds bot-dependent extensions to the given bot.
+     * Used by the constructor and rejoin() to keep extensions in sync.
+     */
+    private _bindExtensions(bot: Bot): void {
         const extensions = createPlayerExtensions(bot);
         this.waitForGui = extensions.waitForGui.bind(this);
         this.waitForGuiItem = extensions.waitForGuiItem.bind(this);
         this.clickGuiItem = extensions.clickGuiItem.bind(this);
         this.gui = extensions.gui.bind(this);
+    }
+
+    /**
+     * Eagerly captures spawn/error/kicked events into a promise.
+     * Must be called synchronously after createBot() - before any await -
+     * so the spawn event cannot be missed.
+     * @internal
+     */
+    _captureSpawnPromise(timeout: number = 10000): void {
+        const botUsername = this.username;
+        const bot = this.bot;
+
+        this._spawnPromise = new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                cleanup();
+                reject(new Error(`Bot ${botUsername} failed to spawn within ${timeout}ms`));
+            }, timeout);
+
+            const onSpawn = () => {
+                cleanup();
+                console.log(`${pc.cyan('[Bot]')} ${pc.dim(`${botUsername} spawned successfully`)}`);
+                resolve();
+            };
+
+            const onError = (err: Error) => {
+                cleanup();
+                console.log(pc.red(`[Bot] ${botUsername} connection error: ${err.message}`));
+                reject(err);
+            };
+
+            const onKicked = (reason: string) => {
+                cleanup();
+                console.log(pc.red(`[Bot] ${botUsername} kicked: ${reason}`));
+                reject(new Error(`Bot ${botUsername} was kicked: ${reason}`));
+            };
+
+            const cleanup = () => {
+                clearTimeout(timer);
+                bot.removeListener('spawn', onSpawn);
+                bot.removeListener('error', onError);
+                bot.removeListener('kicked', onKicked);
+            };
+
+            bot.once('spawn', onSpawn);
+            bot.once('error', onError);
+            bot.once('kicked', onKicked);
+        });
+
+        // Prevent unhandled rejection if kicked/error fires before join() awaits
+        this._spawnPromise.catch(() => {});
+    }
+
+    /**
+     * Connects the bot to the server and waits until it spawns.
+     * Resolves when the player has successfully joined.
+     * Rejects if the player is kicked, encounters a connection error, or
+     * the timeout elapses before spawning.
+     */
+    async join(options: { timeout?: number } = {}): Promise<void> {
+        const { timeout = 10000 } = options;
+
+        // If no spawn promise was captured eagerly, capture now as fallback
+        if (!this._spawnPromise) {
+            this._captureSpawnPromise(timeout);
+        }
+
+        await this._spawnPromise;
+        this._spawnPromise = null;
+
+        this._registerPersistentListeners();
+    }
+
+    /**
+     * Registers persistent message/window listeners on the current bot.
+     * Guarded: calling join() twice on the same bot won't duplicate listeners.
+     */
+    private _registerPersistentListeners(): void {
+        if (this._listenersBot === this.bot) return;
+        this._listenersBot = this.bot;
+
+        const botUsername = this.username;
+        const bot = this.bot;
+
+        bot.on('message', (jsonMsg: unknown) => {
+            const message = String(jsonMsg);
+            console.log(pc.dim(`[Bot ${botUsername}] Received message: "${message}"`));
+            messageBuffer.push(message);
+        });
+
+        bot.on('windowOpen', (window: unknown) => {
+            const win = window as { title?: string; type?: string | number; slots?: unknown[] };
+            console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] Global windowOpen event - Title: "${win.title}", Type: ${win.type}, SlotCount: ${win.slots?.length}`));
+        });
+
+        bot.on('windowClose', (window: unknown) => {
+            const win = window as { title?: string };
+            console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] windowClose event - Window: ${win?.title || 'unknown'}`));
+        });
+
     }
 
     setServerWrapper(server: ServerWrapper): void {
@@ -549,6 +692,66 @@ export class PlayerWrapper {
             },
             { message: `Teleport to ${x} ${y} ${z} timed out` }
         );
+    }
+
+    /** @internal */
+    _setBotOptions(opts: { host: string; port: number; version: string | undefined; auth: 'mojang' | 'microsoft' | 'offline' }): void {
+        this._botOptions = opts;
+    }
+
+    /**
+     * Disconnects the bot if connected, then reconnects with the same username and waits for spawn.
+     * Useful for verifying whether a player can or cannot rejoin after being banned/kicked.
+     *
+     * @example
+     * // Assert that a banned player cannot rejoin:
+     * await expect(target.rejoin()).rejects.toThrow();
+     */
+    async rejoin(options: { timeout?: number } = {}): Promise<void> {
+        if (!this._botOptions) {
+            throw new Error('Cannot rejoin: bot connection options not set. Use createPlayer() to create players.');
+        }
+
+        const botUsername = this.username;
+        const oldBot = this.bot;
+
+        // Disconnect current bot - skips wait if already ended
+        await disconnectBot(oldBot, botUsername);
+
+        const idx = activeBots.indexOf(oldBot);
+        if (idx !== -1) activeBots.splice(idx, 1);
+
+        // Create a fresh bot with the same credentials
+        const newBot = mineflayer.createBot({
+            host: this._botOptions.host,
+            port: this._botOptions.port,
+            username: botUsername,
+            version: this._botOptions.version,
+            auth: this._botOptions.auth,
+        });
+        activeBots.push(newBot);
+        newBot.once('end', (reason: string) => {
+            console.log(pc.dim(`[Bot] ${botUsername} connection ended: ${reason}`));
+        });
+
+        // Rebind all bot-dependent state via shared helper
+        this.bot = newBot;
+        this.inventory = newBot.inventory;
+        this._listenersBot = null;
+        this._bindExtensions(newBot);
+
+        // Capture spawn promise SYNCHRONOUSLY - before any await
+        this._captureSpawnPromise(options.timeout || 10000);
+
+        try {
+            await this.join(options);
+        } catch (err) {
+            // Clean up the failed bot so it doesn't leak
+            this.bot.removeAllListeners();
+            const idx = activeBots.indexOf(this.bot);
+            if (idx !== -1) activeBots.splice(idx, 1);
+            throw err;
+        }
     }
 
     async giveItem(item: string, count: number = 1): Promise<void> {
@@ -751,56 +954,22 @@ export async function runTestSession(): Promise<void> {
 
                     activeBots.push(bot);
 
-                    await new Promise<void>((resolve, reject) => {
-                        const timeout = setTimeout(() => {
-                            reject(new Error(`Bot ${botUsername} failed to spawn within 10 seconds`));
-                        }, 10000);
-
-                        bot.once('spawn', () => {
-                            console.log(`${pc.cyan('[Bot]')} ${pc.dim(`${botUsername} spawned successfully`)}`);
-                            clearTimeout(timeout);
-                            resolve();
-                        });
-
-                        bot.once('error', (err: Error) => {
-                            console.log(pc.red(`[Bot] ${botUsername} connection error: ${err.message}`));
-                            clearTimeout(timeout);
-                            reject(err);
-                        });
-
-                        bot.once('kicked', (reason: string) => {
-                            console.log(pc.red(`[Bot] ${botUsername} kicked: ${reason}`));
-                            clearTimeout(timeout);
-                            reject(new Error(`Bot ${botUsername} was kicked: ${reason}`));
-                        });
-
-                        bot.once('end', (reason: string) => {
-                            console.log(pc.dim(`[Bot] ${botUsername} connection ended: ${reason}`));
-                        });
-                    });
-
-                    bot.on('message', (jsonMsg: unknown) => {
-                        const message = String(jsonMsg);
-                        console.log(pc.dim(`[Bot ${botUsername}] Received message: "${message}"`));
-                        messageBuffer.push(message);
-                    });
-
-                    bot.on('windowOpen', (window: unknown) => {
-                        const win = window as { title?: string; type?: string | number; slots?: unknown[] };
-                        console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] Global windowOpen event - Title: "${win.title}", Type: ${win.type}, SlotCount: ${win.slots?.length}`));
-                    });
-
-                    bot.on('windowClose', (window: unknown) => {
-                        const win = window as { title?: string };
-                        console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] windowClose event - Window: ${win?.title || 'unknown'}`));
-                    });
-
-                    (bot as Bot & { _client: EventEmitterLike })._client.on('open_window', (packet: unknown) => {
-                        console.log(pc.gray(`[DEBUG] [Bot ${botUsername}] Raw open_window packet: ${JSON.stringify(packet)}`));
+                    bot.once('end', (reason: string) => {
+                        console.log(pc.dim(`[Bot] ${botUsername} connection ended: ${reason}`));
                     });
 
                     const player = new PlayerWrapper(bot);
+                    player.username = botUsername;
+                    player._captureSpawnPromise();
                     player.setServerWrapper(server);
+                    player._setBotOptions({
+                        host: 'localhost',
+                        port: 25565,
+                        version: process.env.MC_VERSION,
+                        auth: 'offline',
+                    });
+
+                    await player.join();
                     return player;
                 };
 
@@ -873,6 +1042,10 @@ export async function runTestSession(): Promise<void> {
 
     } finally {
         // Disconnect all bots
+        for (const bot of activeBots) {
+            bot.removeAllListeners();
+        }
+
         await Promise.all(activeBots.map(bot => {
             return new Promise<void>((resolve) => {
                 const timeout = setTimeout(() => {
