@@ -187,19 +187,20 @@ class RunnerMatchers<T = unknown> extends Matchers<T> {
     async toHaveReceivedMessage(
         this: RunnerMatchers<PlayerWrapper | ServerWrapper>,
         expectedMessage: string | RegExp,
-        options: { strict?: boolean; timeout?: number; pollingRate?: number } = {}
+        options: { strict?: boolean; timeout?: number; pollingRate?: number; since?: number } = {}
     ): Promise<void> {
-        const { strict = false, timeout, pollingRate } = options;
+        const { strict = false, timeout, pollingRate, since } = options;
         const isMatch = (msg: string): boolean => {
             if (expectedMessage instanceof RegExp) return expectedMessage.test(msg);
             return strict ? msg === expectedMessage : msg.includes(expectedMessage);
         };
 
         const buffer = this.actual instanceof PlayerWrapper ? messageBuffer : serverConsoleBuffer;
+        const view = (): string[] => since !== undefined ? buffer.slice(since) : buffer;
 
         await this.pollAssertion(
-            () => buffer.some(isMatch),
-            () => `Expected NOT to receive message matching "${expectedMessage}", but received: "${buffer.find(isMatch)}"`,
+            () => view().some(isMatch),
+            () => `Expected NOT to receive message matching "${expectedMessage}", but received: "${view().find(isMatch)}"`,
             () => `Expected message matching "${expectedMessage}" not received`,
             { timeout, pollingRate }
         );
@@ -632,6 +633,10 @@ export class PlayerWrapper {
     chat(message: string): void {
         console.log(`${pc.cyan('[Bot]')} ${pc.dim(`Chatting: ${message}`)}`);
         this.bot.chat(message);
+    }
+
+    getMessageBufferIndex(): number {
+        return messageBuffer.length;
     }
 
     nextMessage(options: { timeout?: number } = {}): Promise<string> {
