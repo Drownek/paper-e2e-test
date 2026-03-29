@@ -454,8 +454,14 @@ function disconnectBot(bot: Bot, label: string, timeoutMs: number = 3000): Promi
 
 export class PlayerWrapper {
     bot: Bot;
-    inventory: Bot['inventory'];
-    username: string;
+
+    get inventory() {
+        return this.bot.inventory;
+    }
+
+    get username() {
+        return this.bot.username;
+    }
 
     /**
      * @deprecated Use `player.gui({ title })` instead. This method will be removed in a future version.
@@ -505,8 +511,6 @@ export class PlayerWrapper {
 
     constructor(bot: Bot) {
         this.bot = bot;
-        this.inventory = bot.inventory;
-        this.username = bot.username;
         this._bindExtensions(bot);
     }
 
@@ -714,7 +718,7 @@ export class PlayerWrapper {
      */
     async rejoin(options: { timeout?: number } = {}): Promise<void> {
         if (!this._botOptions) {
-            throw new Error('Cannot rejoin: bot connection options not set. Use createPlayer() to create players.');
+            throw new Error('Cannot rejoin: bot connection options not set. Use wrapPlayer() to create players.');
         }
 
         const botUsername = this.username;
@@ -741,7 +745,6 @@ export class PlayerWrapper {
 
         // Rebind all bot-dependent state via shared helper
         this.bot = newBot;
-        this.inventory = newBot.inventory;
         this._listenersBot = null;
         this._bindExtensions(newBot);
 
@@ -964,7 +967,6 @@ export async function runTestSession(): Promise<void> {
                     });
 
                     const player = new PlayerWrapper(bot);
-                    player.username = botUsername;
                     player._captureSpawnPromise();
                     player.setServerWrapper(server);
                     player._setBotOptions({
