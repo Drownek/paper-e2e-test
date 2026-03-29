@@ -149,6 +149,9 @@ abstract class TestE2ETask : DefaultTask() {
         // Configure bukkit.yml settings
         configureBukkitSettings(runDirectory)
 
+        // Configure spigot.yml settings
+        configureSpigotSettings(runDirectory)
+
         // Create plugins directory if it doesn't exist
         val pluginsDir = File(runDirectory, "plugins")
         if (!pluginsDir.exists()) {
@@ -411,6 +414,39 @@ abstract class TestE2ETask : DefaultTask() {
             logger.lifecycle("Set connection-throttle to 0 in bukkit.yml")
         } catch (e: Exception) {
             logger.warn("Warning: Could not configure bukkit.yml: ${e.message}")
+        }
+    }
+
+    private fun configureSpigotSettings(serverDirectory: File) {
+        val spigotYmlFile = File(serverDirectory, "spigot.yml")
+
+        try {
+            val dumperOptions = DumperOptions().apply {
+                defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
+                isPrettyFlow = true
+            }
+            val yaml = Yaml(dumperOptions)
+
+            val spigotConfig: MutableMap<String, Any> = if (spigotYmlFile.exists()) {
+                val content = spigotYmlFile.readText()
+                yaml.load(content) ?: mutableMapOf()
+            } else {
+                mutableMapOf()
+            }
+
+            // Ensure settings section exists
+            @Suppress("UNCHECKED_CAST")
+            val settings = spigotConfig.getOrPut("settings") { mutableMapOf<String, Any>() } as MutableMap<String, Any>
+
+            // Disable movement anti-cheat checks — bots get teleported large distances instantly
+            settings["moved-wrongly-threshold"] = 1000.0
+            settings["moved-too-quickly-multiplier"] = 1000.0
+
+            val updatedContent = yaml.dump(spigotConfig)
+            spigotYmlFile.writeText(updatedContent)
+            logger.lifecycle("Set moved-wrongly-threshold and moved-too-quickly-multiplier to 1000 in spigot.yml")
+        } catch (e: Exception) {
+            logger.warn("Warning: Could not configure spigot.yml: ${e.message}")
         }
     }
 
