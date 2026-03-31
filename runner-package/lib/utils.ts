@@ -72,3 +72,43 @@ export async function waitUntil(
 
     throw new Error(message);
 }
+
+/**
+ * Asserts that `predicate` remains truthy continuously for the entire `duration`,
+ * checking every `interval` ms. Fails immediately if the condition is ever false,
+ * or if it never becomes true within `timeout`.
+ *
+ * @throws {Error} if the condition is false at any point during the stable window.
+ */
+export async function waitForStable(
+    predicate: () => boolean | Promise<boolean>,
+    {
+        duration = 5000,
+        interval = 100,
+        timeout = 10000,
+        message = "waitForStable: condition was not stable for the required duration",
+    }: {
+        duration?: number;
+        interval?: number;
+        timeout?: number;
+        message?: string;
+    } = {}
+): Promise<void> {
+    const deadline = Date.now() + timeout;
+
+    // First, wait until the condition becomes true
+    while (Date.now() < deadline) {
+        if (await predicate()) break;
+        await sleep(interval);
+        if (Date.now() >= deadline) throw new Error(message);
+    }
+
+    // Then, verify it stays true for the entire `duration`
+    const stableDeadline = Date.now() + duration;
+    while (Date.now() < stableDeadline) {
+        if (!(await predicate())) {
+            throw new Error(message);
+        }
+        await sleep(Math.min(interval, Math.max(0, stableDeadline - Date.now())));
+    }
+}

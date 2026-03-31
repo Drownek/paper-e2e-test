@@ -1,5 +1,8 @@
 # Paper E2E Test Framework
 
+[![npm version](https://badge.fury.io/js/%40drownek%2Fpaper-e2e-runner.svg)](https://www.npmjs.com/package/@drownek/paper-e2e-runner)
+[![Downloads](https://img.shields.io/npm/dm/@drownek/paper-e2e-runner.svg)](https://www.npmjs.com/package/@drownek/paper-e2e-runner)
+
 End-to-end testing framework for Paper/Spigot Minecraft plugins with support for both JavaScript and TypeScript.
 
 ## Features
