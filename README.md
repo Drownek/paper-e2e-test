@@ -17,52 +17,7 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 
 ## Quick Start
 
-### 1. Add Gradle Plugin
-
-```kotlin
-plugins {
-    id("io.github.drownek.paper-e2e") version "1.1.0"
-}
-
-e2e {
-    minecraftVersion.set("1.19.4")
-    runDir.set("run")
-    testsDir.set(file("src/test/e2e"))
-    acceptEula.set(true)
-}
-```
-
-### 2. Setup Tests
-
-Create `src/test/e2e/package.json`:
-```json
-{
-  "type": "module",
-  "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.1.0"
-  }
-}
-```
-
-Run `npm install` in `src/test/e2e`.
-
-### 3. Write Your First Test
-
-Create `src/test/e2e/my-test.spec.js`:
-```javascript
-import { test, expect } from '@drownek/paper-e2e-runner';
-
-test('player receives welcome message', async ({ player }) => {
-  player.chat('/help');
-  await expect(player).toHaveReceivedMessage('Available commands');
-});
-```
-
-### 4. Run Tests
-
-```bash
-./gradlew testE2E
-```
+Please refer to the [Getting Started](https://github.com/Drownek/paper-e2e-test/wiki/Getting-Started) guide for detailed setup instructions.
 
 ## Documentation
 
