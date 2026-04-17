@@ -37,3 +37,18 @@ java {
         languageVersion.set(JavaLanguageVersion.of(17))
     }
 }
+
+val generateVersionResource = tasks.register("generateVersionResource") {
+    val outFile = layout.buildDirectory.file("generated/version-resource/paper-e2e-version.properties")
+    inputs.property("version", projectVersion)
+    outputs.file(outFile)
+    doLast {
+        val f = outFile.get().asFile
+        f.parentFile.mkdirs()
+        f.writeText("version=$projectVersion\n")
+    }
+}
+
+sourceSets.named("main") {
+    resources.srcDir(generateVersionResource.map { it.outputs.files.singleFile.parentFile })
+}

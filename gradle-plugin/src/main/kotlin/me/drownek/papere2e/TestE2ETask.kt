@@ -69,6 +69,8 @@ abstract class TestE2ETask : DefaultTask() {
 
     @TaskAction
     fun runTests() {
+        // Banner is printed by the cleanE2E task that runs before this one
+        // (or by the Node runner in standalone mode). Avoid duplicating here.
         val serverJar = serverJarPath.get()
         val serverDirectory = serverDir.get()
         val mcVersion = minecraftVersion.get()
@@ -244,7 +246,9 @@ abstract class TestE2ETask : DefaultTask() {
             "SERVER_DIR" to serverDirectory.trim(),
             "JAVA_PATH" to javaPath,
             "JVM_ARGS" to jvmArgsString,
-            "MC_VERSION" to mcVersion
+            "MC_VERSION" to mcVersion,
+            // The Gradle plugin already printed its banner; don't duplicate it.
+            "PAPER_E2E_NO_BANNER" to "1"
         )
 
         if (testFiles.isPresent) {

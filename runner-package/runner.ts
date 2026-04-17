@@ -1,10 +1,47 @@
 import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
-import { readdir } from 'fs/promises';
+import { readdir, readFile } from 'fs/promises';
 import { join, basename } from 'path';
 import { pathToFileURL } from 'url';
 import { randomUUID } from 'node:crypto';
 import { install as installSourceMapSupport } from 'source-map-support';
 import pc from 'picocolors';
+
+type RGB = [number, number, number];
+
+function gradientText(text: string, from: RGB, to: RGB): string {
+    const n = text.length;
+    let out = '';
+    for (let i = 0; i < n; i++) {
+        const t = n <= 1 ? 0 : i / (n - 1);
+        const r = Math.round(from[0] + (to[0] - from[0]) * t);
+        const g = Math.round(from[1] + (to[1] - from[1]) * t);
+        const b = Math.round(from[2] + (to[2] - from[2]) * t);
+        out += `\x1b[38;2;${r};${g};${b}m${text[i]}`;
+    }
+    return out + '\x1b[0m';
+}
+
+async function readRunnerVersion(): Promise<string> {
+    try {
+        const url = new URL('../package.json', import.meta.url);
+        const pkg = JSON.parse(await readFile(url, 'utf8'));
+        return pkg.version || 'unknown';
+    } catch {
+        return 'unknown';
+    }
+}
+
+async function printBanner(): Promise<void> {
+    if (process.env.PAPER_E2E_NO_BANNER === '1') return;
+    const version = await readRunnerVersion();
+    // teal -> purple gradient
+    const title = gradientText('paper-e2e', [0x5e, 0xea, 0xd4], [0xc0, 0x82, 0xff]);
+    const rule = pc.dim('─'.repeat(60));
+    console.log('');
+    console.log(`  ${pc.bold(title)}  ${pc.dim('v' + version + '  -  end-to-end testing for paper plugins')}`);
+    console.log(`  ${rule}`);
+    console.log('');
+}
 
 import { ItemWrapper, GuiWrapper } from './lib/wrappers.js';
 import { PlayerWrapper } from './lib/player.js';
@@ -90,7 +127,9 @@ export async function runTestSession(): Promise<void> {
 
     let exitCode = 0;
 
-    console.log(`\n${pc.bold('Starting Paper server...')}`);
+    await printBanner();
+
+    console.log(`${pc.bold('Starting Paper server...')}`);
 
     const jvmArgsString = process.env.JVM_ARGS || '';
     const jvmArgs = jvmArgsString.split(' ').filter(arg => arg.trim() !== '');

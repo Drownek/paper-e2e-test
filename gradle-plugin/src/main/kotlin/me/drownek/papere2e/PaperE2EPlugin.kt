@@ -19,11 +19,11 @@ class PaperE2EPlugin : Plugin<Project> {
                 val excludePatterns = extension.cleanExcludePatterns.get()
 
                 if (!runDir.exists()) {
-                    project.logger.lifecycle("🧹 [E2E] Run directory doesn't exist yet, nothing to clean")
+                    project.logger.lifecycle("  Run directory doesn't exist yet, nothing to clean")
                     return@doLast
                 }
 
-                project.logger.lifecycle("🧹 [E2E] Cleaning run directory, excluding: ${excludePatterns.joinToString(", ")}")
+                project.logger.lifecycle("  Cleaning run directory (excluding: ${excludePatterns.joinToString(", ")})")
 
                 // Get all files and directories in the run folder
                 val allEntries = runDir.listFiles() ?: emptyArray()
@@ -47,13 +47,11 @@ class PaperE2EPlugin : Plugin<Project> {
                 }
 
                 if (deletedFiles.isNotEmpty()) {
-                    project.logger.lifecycle("🧹 [E2E] Deleted: ${deletedFiles.joinToString(", ")}")
+                    project.logger.lifecycle("    deleted:   ${deletedFiles.joinToString(", ")}")
                 }
                 if (keptFiles.isNotEmpty()) {
-                    project.logger.lifecycle("🧹 [E2E] Preserved: ${keptFiles.joinToString(", ")}")
+                    project.logger.lifecycle("    preserved: ${keptFiles.joinToString(", ")}")
                 }
-
-                project.logger.lifecycle("🧹 [E2E] Cleaned run directory")
             }
         }
 
@@ -99,6 +97,15 @@ class PaperE2EPlugin : Plugin<Project> {
                     javaLauncher.set(javaToolchains.launcherFor(javaExtension.toolchain))
                 }
             }
+        }
+
+        // Print the banner once, before any "> Task :..." header, but only
+        // when one of our E2E tasks is actually in the task graph.
+        project.gradle.taskGraph.whenReady {
+            val ours = allTasks.any { task ->
+                task.project === project && (task.name == "testE2E" || task.name == "cleanE2E")
+            }
+            if (ours) Banner.print(project.logger)
         }
 
         project.afterEvaluate {
