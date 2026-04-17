@@ -53,31 +53,33 @@ export class PlayerWrapper {
 
     /** @internal */
     _captureSpawnPromise(timeout: number = 10000): void {
-        const botUsername = this.username;
         const bot = this.bot;
+        // NOTE: bot.username is undefined until the client actually connects
+        // and completes the handshake, so we resolve it lazily inside handlers.
+        const name = (): string => bot.username ?? this.username ?? 'bot';
 
         this._spawnPromise = new Promise<void>((resolve, reject) => {
             const timer = setTimeout(() => {
                 cleanup();
-                reject(new Error(`Bot ${botUsername} failed to spawn within ${timeout}ms`));
+                reject(new Error(`Bot ${name()} failed to spawn within ${timeout}ms`));
             }, timeout);
 
             const onSpawn = () => {
                 cleanup();
-                console.log(`${pc.cyan('[Bot]')} ${pc.dim(`${botUsername} spawned successfully`)}`);
+                console.log(`${pc.cyan('[Bot]')} ${pc.dim(`${name()} spawned successfully`)}`);
                 resolve();
             };
 
             const onError = (err: Error) => {
                 cleanup();
-                console.log(pc.red(`[Bot] ${botUsername} connection error: ${err.message}`));
+                console.log(pc.red(`[Bot] ${name()} connection error: ${err.message}`));
                 reject(err);
             };
 
             const onKicked = (reason: string) => {
                 cleanup();
-                console.log(pc.red(`[Bot] ${botUsername} kicked: ${reason}`));
-                reject(new Error(`Bot ${botUsername} was kicked: ${reason}`));
+                console.log(pc.red(`[Bot] ${name()} kicked: ${reason}`));
+                reject(new Error(`Bot ${name()} was kicked: ${reason}`));
             };
 
             const cleanup = () => {
