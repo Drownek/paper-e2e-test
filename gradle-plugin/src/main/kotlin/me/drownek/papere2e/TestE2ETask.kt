@@ -461,8 +461,39 @@ abstract class TestE2ETask : DefaultTask() {
         val processBuilder = ProcessBuilder(cmd)
         processBuilder.directory(dir)
         processBuilder.environment().putAll(env)
-        
+
         val process = processBuilder.start()
+
+        // If Gradle/this JVM is killed (e.g. IDE "Stop" button), make sure the
+        // spawned process tree (node -> java paper server) dies with us.
+        // Without this, the Paper server keeps running and holds run/logs/latest.log,
+        // which makes the next cleanE2E fail on Windows with "Unable to delete directory".
+        val shutdownHook = Thread {
+            try {
+                if (process.isAlive) {
+                    val handle = process.toHandle()
+                    // Collect descendants BEFORE destroying the root (destroy may detach them).
+                    val descendants = handle.descendants().toList()
+                    descendants.forEach { it.destroyForcibly() }
+                    handle.destroyForcibly()
+                }
+            } catch (_: Throwable) {
+                // best effort
+            }
+        }
+        Runtime.getRuntime().addShutdownHook(shutdownHook)
+        try {
+            runProcess(process, command)
+        } finally {
+            try {
+                Runtime.getRuntime().removeShutdownHook(shutdownHook)
+            } catch (_: IllegalStateException) {
+                // JVM already shutting down
+            }
+        }
+    }
+
+    private fun runProcess(process: Process, command: Array<out String>) {
 
         // Capture stdout
         val stdoutThread = Thread {

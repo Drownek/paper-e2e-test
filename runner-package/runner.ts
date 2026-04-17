@@ -102,6 +102,54 @@ export async function runTestSession(): Promise<void> {
         stdio: ['pipe', 'pipe', 'pipe']
     });
 
+    // Ensure the Paper server dies if our runner is killed (e.g. Gradle task
+    // cancelled from the IDE). Otherwise the java.exe keeps running and holds
+    // run/logs/latest.log open, breaking the next cleanE2E on Windows.
+    const killServerTree = (): void => {
+        if (!serverProcess.pid || serverProcess.killed || serverProcess.exitCode !== null) return;
+        try {
+            if (process.platform === 'win32') {
+                // taskkill recursively kills the whole java process tree.
+                spawn('taskkill', ['/F', '/T', '/PID', String(serverProcess.pid)], {
+                    stdio: 'ignore',
+                    windowsHide: true,
+                }).on('error', () => { /* best effort */ });
+            } else {
+                serverProcess.kill('SIGKILL');
+            }
+        } catch {
+            /* best effort */
+        }
+    };
+
+    let cleanupStarted = false;
+    const emergencyShutdown = (signal: string): void => {
+        if (cleanupStarted) return;
+        cleanupStarted = true;
+        console.log(pc.yellow(`\n[runner] Received ${signal}, killing Paper server...`));
+        killServerTree();
+        // Give taskkill a moment, then exit.
+        setTimeout(() => process.exit(1), 500).unref();
+    };
+
+    process.on('SIGINT', () => emergencyShutdown('SIGINT'));
+    process.on('SIGTERM', () => emergencyShutdown('SIGTERM'));
+    process.on('SIGHUP', () => emergencyShutdown('SIGHUP'));
+    if (process.platform === 'win32') {
+        process.on('SIGBREAK', () => emergencyShutdown('SIGBREAK'));
+    }
+    // Last-resort safety net: if this node process exits for any reason while
+    // the server is still alive, try to take it down with us.
+    process.on('exit', () => killServerTree());
+    // On Windows, when the parent (Gradle) is killed abruptly, signals are not
+    // delivered but our stdin pipe closes. Use that as a death signal.
+    if (process.stdin && typeof process.stdin.on === 'function') {
+        process.stdin.on('close', () => emergencyShutdown('stdin-close'));
+        process.stdin.on('end', () => emergencyShutdown('stdin-end'));
+        // stdin must be resumed for 'end'/'close' to fire on a piped stdin.
+        try { process.stdin.resume(); } catch { /* ignore */ }
+    }
+
     try {
         await waitForServerStart(serverProcess);
         console.log(`${pc.green(pc.bold('Server started successfully'))}\n`);
