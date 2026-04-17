@@ -469,17 +469,7 @@ abstract class TestE2ETask : DefaultTask() {
         // Without this, the Paper server keeps running and holds run/logs/latest.log,
         // which makes the next cleanE2E fail on Windows with "Unable to delete directory".
         val shutdownHook = Thread {
-            try {
-                if (process.isAlive) {
-                    val handle = process.toHandle()
-                    // Collect descendants BEFORE destroying the root (destroy may detach them).
-                    val descendants = handle.descendants().toList()
-                    descendants.forEach { it.destroyForcibly() }
-                    handle.destroyForcibly()
-                }
-            } catch (_: Throwable) {
-                // best effort
-            }
+            if (process.isAlive) killProcessTree(process)
         }
         Runtime.getRuntime().addShutdownHook(shutdownHook)
         try {
@@ -501,7 +491,7 @@ abstract class TestE2ETask : DefaultTask() {
                 lines.forEach { logger.lifecycle(it) }
             }
         }
-        
+
         // Capture stderr
         val stderrThread = Thread {
             process.errorStream.bufferedReader(Charsets.UTF_8).useLines { lines ->
@@ -512,12 +502,45 @@ abstract class TestE2ETask : DefaultTask() {
         stdoutThread.start()
         stderrThread.start()
 
-        val exitCode = process.waitFor()
+        val exitCode = try {
+            process.waitFor()
+        } catch (e: InterruptedException) {
+            // Gradle cancelled the build (e.g. IDE "Stop" button). The daemon
+            // stays alive so shutdown hooks never run — we must tear down the
+            // spawned node/java tree ourselves right here.
+            logger.lifecycle("[E2E] Build cancelled, terminating server process tree...")
+            killProcessTree(process)
+            try { stdoutThread.join(2000) } catch (_: InterruptedException) {}
+            try { stderrThread.join(2000) } catch (_: InterruptedException) {}
+            Thread.currentThread().interrupt()
+            throw RuntimeException("E2E build cancelled; spawned server was terminated.", e)
+        }
         stdoutThread.join()
         stderrThread.join()
 
         if (exitCode != 0) {
             throw RuntimeException("Command '${command.joinToString(" ")}' failed with exit code: $exitCode")
+        }
+    }
+
+    private fun killProcessTree(process: Process) {
+        try {
+            val handle = process.toHandle()
+            // Collect descendants BEFORE destroying the root — once the root
+            // dies the child references can be lost on some platforms.
+            val descendants = handle.descendants().toList()
+            descendants.forEach {
+                try { it.destroyForcibly() } catch (_: Throwable) {}
+            }
+            handle.destroyForcibly()
+            // Wait briefly so Windows releases file handles (e.g. latest.log)
+            // before the next cleanE2E runs.
+            process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+            descendants.forEach {
+                try { it.onExit().get(2, java.util.concurrent.TimeUnit.SECONDS) } catch (_: Throwable) {}
+            }
+        } catch (_: Throwable) {
+            // best effort
         }
     }
 }
