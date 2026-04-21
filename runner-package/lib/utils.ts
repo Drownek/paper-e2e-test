@@ -1,4 +1,15 @@
-export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+export const sleep = (ms: number, signal?: AbortSignal) => {
+    return new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) return reject(new Error('Aborted'));
+        const timeout = setTimeout(resolve, ms);
+        if (signal) {
+            signal.addEventListener('abort', () => {
+                clearTimeout(timeout);
+                reject(new Error('Aborted'));
+            }, { once: true });
+        }
+    });
+};
 
 /**
  * Polls `fn` until it returns a non-undefined value, or throws on timeout.
@@ -10,15 +21,17 @@ export async function poll<T>(
         timeout?: number;
         interval?: number;
         message?: string | (() => string);
+        signal?: AbortSignal;
     } = {}
 ): Promise<T> {
-    const { timeout = 5000, interval = 50, message = 'poll() timed out' } = options;
+    const { timeout = 5000, interval = 50, message = 'poll() timed out', signal } = options;
     const deadline = Date.now() + timeout;
 
     while (Date.now() < deadline) {
+        if (signal?.aborted) throw new Error('Aborted');
         const result = await fn();
         if (result !== undefined) return result;
-        await sleep(interval);
+        await sleep(interval, signal);
     }
 
     throw new Error(`Timeout: ${typeof message === 'function' ? message() : message}`);
@@ -30,18 +43,19 @@ export async function poll<T>(
  */
 export async function waitForAssertion(
     fn: () => Promise<void>,
-    { timeout = 5000, interval = 250 } = {}
+    { timeout = 5000, interval = 250, signal }: { timeout?: number, interval?: number, signal?: AbortSignal } = {}
 ): Promise<void> {
     const start = Date.now();
     let lastError: unknown;
 
     while (Date.now() - start < timeout) {
+        if (signal?.aborted) throw new Error('Aborted');
         try {
             await fn();
             return; // passed
         } catch (e) {
             lastError = e;
-            await sleep(interval);
+            await sleep(interval, signal);
         }
     }
     throw lastError;
@@ -59,15 +73,17 @@ export async function waitUntil(
         timeout = 5000,
         interval = 250,
         message = "waitUntil timed out: condition was not met",
-    } = {}
+        signal
+    }: { timeout?: number, interval?: number, message?: string, signal?: AbortSignal } = {}
 ): Promise<void> {
     const start = Date.now();
 
     while (Date.now() - start < timeout) {
+        if (signal?.aborted) throw new Error('Aborted');
         if (await predicate()) {
             return; // condition met
         }
-        await sleep(interval);
+        await sleep(interval, signal);
     }
 
     throw new Error(message);
@@ -87,28 +103,32 @@ export async function waitForStable(
         interval = 100,
         timeout = 10000,
         message = "waitForStable: condition was not stable for the required duration",
+        signal
     }: {
         duration?: number;
         interval?: number;
         timeout?: number;
         message?: string;
+        signal?: AbortSignal;
     } = {}
 ): Promise<void> {
     const deadline = Date.now() + timeout;
 
     // First, wait until the condition becomes true
     while (Date.now() < deadline) {
+        if (signal?.aborted) throw new Error('Aborted');
         if (await predicate()) break;
-        await sleep(interval);
+        await sleep(interval, signal);
         if (Date.now() >= deadline) throw new Error(message);
     }
 
     // Then, verify it stays true for the entire `duration`
     const stableDeadline = Date.now() + duration;
     while (Date.now() < stableDeadline) {
+        if (signal?.aborted) throw new Error('Aborted');
         if (!(await predicate())) {
             throw new Error(message);
         }
-        await sleep(Math.min(interval, Math.max(0, stableDeadline - Date.now())));
+        await sleep(Math.min(interval, Math.max(0, stableDeadline - Date.now())), signal);
     }
 }

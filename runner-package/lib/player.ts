@@ -247,7 +247,6 @@ export class PlayerWrapper {
         try {
             await this.join(options);
         } catch (err) {
-            this.bot.removeAllListeners();
             const idx = activeBots.indexOf(this.bot);
             if (idx !== -1) activeBots.splice(idx, 1);
             throw err;

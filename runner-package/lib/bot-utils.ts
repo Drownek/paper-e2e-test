@@ -14,7 +14,6 @@ export const serverConsoleBuffer: string[] = [];
 export function disconnectBot(bot: Bot, label: string, timeoutMs: number = 3000): Promise<void> {
     const isAlreadyEnded = !!(bot as any)._client?.ended;
     if (isAlreadyEnded) {
-        bot.removeAllListeners();
         return Promise.resolve();
     }
 
@@ -25,7 +24,6 @@ export function disconnectBot(bot: Bot, label: string, timeoutMs: number = 3000)
         }, timeoutMs);
 
         try {
-            bot.removeAllListeners();
             bot.once('end', () => {
                 clearTimeout(timeout);
                 resolve();
@@ -70,11 +68,12 @@ export function createBot(options: {
  * Disconnects all active bots and clears the list.
  */
 export async function disconnectAllBots(): Promise<void> {
-    for (const b of activeBots) {
-        b.removeAllListeners();
-    }
-
     await Promise.all(activeBots.map(b => {
+        const isAlreadyEnded = !!(b as any)._client?.ended;
+        if (isAlreadyEnded) {
+            return Promise.resolve();
+        }
+
         return new Promise<void>((resolve) => {
             const timeout = setTimeout(() => {
                 console.log(pc.yellow(`[WARNING] Bot ${b.username} disconnect timeout, continuing anyway`));

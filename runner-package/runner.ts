@@ -274,16 +274,18 @@ export async function runTestSession(): Promise<void> {
                 const testStartTime = Date.now();
 
                 try {
+                    const abortController = new AbortController();
                     const timeoutMs = process.env.TEST_TIMEOUT ? parseInt(process.env.TEST_TIMEOUT, 10) : 30000;
                     let timeoutHandle: ReturnType<typeof setTimeout>;
                     const timeoutPromise = new Promise<never>((_, reject) => {
                         timeoutHandle = setTimeout(() => {
+                            abortController.abort();
                             reject(new Error(`Test timed out after ${timeoutMs}ms. You can increase this by setting the TEST_TIMEOUT environment variable.`));
                         }, timeoutMs);
                     });
 
                     await Promise.race([
-                        testCase.fn({ player, server, createPlayer }).finally(() => clearTimeout(timeoutHandle)),
+                        testCase.fn({ player, server, createPlayer, signal: abortController.signal }).finally(() => clearTimeout(timeoutHandle)),
                         timeoutPromise
                     ]);
 

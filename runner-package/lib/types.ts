@@ -5,6 +5,7 @@ export interface TestContext {
     player: PlayerWrapper;
     server: ServerWrapper;
     createPlayer: (options?: { username?: string }) => Promise<PlayerWrapper>;
+    signal: AbortSignal;
 }
 
 export interface TestResult {
