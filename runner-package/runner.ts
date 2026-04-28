@@ -352,4 +352,4 @@ export async function runTestSession(): Promise<void> {
     }
 }
 
-export { sleep, waitForAssertion, waitUntil } from './lib/utils.js';
+export { sleep, poll, waitForAssertion, waitUntil, waitForStable } from './lib/utils.js';

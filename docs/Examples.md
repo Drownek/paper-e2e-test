@@ -108,12 +108,12 @@ test('warp GUI lists available warps', async ({ player }) => {
   await player.chat('/warps');
   const gui = await player.gui({ title: 'Warps' });
   
-  const spawn = gui.findItem(item => 
+  const spawn = gui.locator(item => 
     item.getDisplayName().includes('Spawn')
   );
   expect(spawn).toBeTruthy();
   
-  await gui.clickItem('compass'); // Assuming compass is spawn warp
+  await gui.locator(item => item.name === 'compass').click(); // Assuming compass is spawn warp
   await expect(player).toHaveReceivedMessage('Teleported');
 });
 ```
