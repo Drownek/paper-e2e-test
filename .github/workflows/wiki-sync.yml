@@ -5,6 +5,9 @@ on:
     types: [published]
   workflow_dispatch: # Allows manual trigger
 
+permissions:
+  contents: write
+
 jobs:
   publish-wiki:
     runs-on: ubuntu-latest
