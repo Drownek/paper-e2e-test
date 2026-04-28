@@ -91,22 +91,6 @@ your-plugin/
     └── server.properties       # Cleaned before each run
 ```
 
-## Verifying Setup
-
-Run this simple test to verify everything works:
-
-```javascript
-import { test, expect } from '@drownek/paper-e2e-runner';
-
-test('framework is working', async ({ player, server }) => {
-  expect(player.bot.username).toContain('Test_');
-  await server.execute('version');
-  await player.chat('Test message');
-});
-```
-
-If this passes, you're ready to write real tests!
-
 ## Next Steps
 
 - [Writing Tests](Writing-Tests) - Learn testing patterns and best practices

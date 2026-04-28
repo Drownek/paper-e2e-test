@@ -87,33 +87,12 @@ By default, the cleanup preserves:
 Everything else in the run directory will be deleted to ensure a clean test environment.
 
 ```kotlin
-e2e {
-    // Use defaults (preserves server.jar, cache, libraries)
-    // No configuration needed
-}
-```
-
-```kotlin
-e2e {
-    // Custom exclusions - add additional files to preserve
-    cleanExcludePatterns.set(listOf(
-        "server.jar",
-        "cache",
-        "libraries",
-        "config.yml",     // Preserve a specific config file
-        "mydata",         // Preserve a custom data folder
-        "backups"         // Preserve backup directory
-    ))
-}
-```
-
-```kotlin
-e2e {
-    // Minimal exclusions - only preserve server.jar
-    cleanExcludePatterns.set(listOf(
-        "server.jar"
-    ))
-}
+// Custom exclusions - add additional files to preserve
+cleanExcludePatterns.set(listOf(
+    "server.jar",
+    "cache",
+    "libraries"
+))
 ```
 
 ### `useExternalPluginsOnly`
@@ -189,12 +168,6 @@ e2e {
     ))
 }
 ```
-
-## Tips
-
-- Always set `acceptEula` to `true` in test environments
-- Keep `runDir` in `.gitignore`
-- Customize `cleanExcludePatterns` to preserve any persistent data your tests need between runs
 
 ## Next Steps
 
