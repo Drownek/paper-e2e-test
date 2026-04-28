@@ -1,0 +1,322 @@
+# Matchers Reference
+
+Complete reference for all available assertion matchers.
+
+## Minecraft-Specific Matchers
+
+### `toHaveReceivedMessage(message, options?)`
+
+Waits for the bot to receive a message containing (or exactly matching) the text or RegExp.
+
+```javascript
+// Partial match (default)
+await expect(player).toHaveReceivedMessage('Welcome');
+
+// RegEx match
+await expect(player).toHaveReceivedMessage(/Welcome/i);
+
+// Exact match
+await expect(player).toHaveReceivedMessage('Welcome to the server!', { strict: true });
+
+// Scoped to messages received after a specific point
+const marker = player.getMessageBufferIndex();
+await player.chat('/action');
+await expect(player).toHaveReceivedMessage('Success', { since: marker });
+
+// Negation
+await expect(player).not.toHaveReceivedMessage('Error');
+```
+
+**Parameters:**
+- `message` (string | RegExp) - Text or pattern to search for
+- `options.strict` (boolean) - Require exact match (default: false)
+- `options.since` (number) - Buffer index to search from
+- `options.timeout` (number) - Max wait time in ms
+
+
+### `toContainItem(itemName)`
+
+Waits for the player's inventory to contain an item with the specified name.
+
+```javascript
+await expect(player).toContainItem('diamond');
+await expect(player).toContainItem('wooden_sword');
+
+// Negation
+await expect(player).not.toContainItem('bedrock');
+```
+
+**Parameters:**
+- `itemName` (string) - Minecraft item name (e.g., 'diamond', 'stone_sword')
+
+**Timeout:** 5 seconds
+
+### `toHaveLore(text, options?)`
+
+Asserts that a GUI item locator contains specific lore text, with automatic retry.
+
+```javascript
+const gui = await player.gui({ title: /Activity/ });
+const item = gui.locator(i => i.name === 'clock');
+
+await expect(item).toHaveLore('Session');
+await expect(item).toHaveLore('messages', { timeout: 10000 });
+await expect(item).not.toHaveLore('error');
+```
+
+**Parameters:**
+- `text` (string) - Text that should appear in lore
+- `options.timeout` (number) - Max wait time in ms (default: 5000)
+- `options.pollingRate` (number) - Check interval in ms (default: 100)
+
+## Basic Equality
+
+### `toBe(value)`
+
+Strict equality check using `Object.is()`. Use for primitives.
+
+```javascript
+expect(42).toBe(42);
+expect('hello').toBe('hello');
+expect(true).toBe(true);
+expect(player.bot.username).toBe('Test_123');
+```
+
+### `toEqual(value)`
+
+Deep equality check. Use for objects and arrays.
+
+```javascript
+expect({ name: 'Steve' }).toEqual({ name: 'Steve' });
+expect([1, 2, 3]).toEqual([1, 2, 3]);
+
+const item = { name: 'diamond', count: 5 };
+expect(item).toEqual({ name: 'diamond', count: 5 });
+```
+
+## Truthiness
+
+### `toBeTruthy()` / `toBeFalsy()`
+
+```javascript
+expect(1).toBeTruthy();
+expect('text').toBeTruthy();
+expect({}).toBeTruthy();
+
+expect(0).toBeFalsy();
+expect('').toBeFalsy();
+expect(null).toBeFalsy();
+expect(undefined).toBeFalsy();
+```
+
+### `toBeNull()` / `toBeUndefined()` / `toBeDefined()`
+
+```javascript
+expect(null).toBeNull();
+expect(undefined).toBeUndefined();
+expect(0).toBeDefined();
+expect(null).toBeDefined();  // null is defined, just null
+```
+
+### `toBeNaN()`
+
+```javascript
+expect(NaN).toBeNaN();
+expect(Number('invalid')).toBeNaN();
+```
+
+## Numbers
+
+### `toBeGreaterThan()` / `toBeGreaterThanOrEqual()`
+
+```javascript
+expect(10).toBeGreaterThan(5);
+expect(10).toBeGreaterThanOrEqual(10);
+
+const inventory = player.inventory.items();
+expect(inventory.length).toBeGreaterThan(0);
+```
+
+### `toBeLessThan()` / `toBeLessThanOrEqual()`
+
+```javascript
+expect(5).toBeLessThan(10);
+expect(10).toBeLessThanOrEqual(10);
+
+const health = player.bot.health;
+expect(health).toBeLessThanOrEqual(20);
+```
+
+### `toBeCloseTo(number, precision?)`
+
+Floating-point comparison with precision (default: 2 decimal places).
+
+```javascript
+expect(0.1 + 0.2).toBeCloseTo(0.3);
+expect(Math.PI).toBeCloseTo(3.14, 2);
+```
+
+## Strings
+
+### `toMatch(regexOrString)`
+
+```javascript
+expect('Hello World').toMatch(/World/);
+expect('Hello World').toMatch('World');
+expect(player.bot.username).toMatch(/Test_\d+/);
+```
+
+### `toContain(substring)`
+
+Works on both strings and arrays.
+
+```javascript
+// Strings
+expect('Hello World').toContain('World');
+expect('Error: Invalid command').toContain('Invalid');
+
+// Arrays
+expect([1, 2, 3]).toContain(2);
+expect(['a', 'b', 'c']).toContain('b');
+
+const items = player.inventory.items().map(i => i.name);
+expect(items).toContain('diamond');
+```
+
+## Arrays and Collections
+
+### `toContainEqual(item)`
+
+Deep equality check for array items.
+
+```javascript
+expect([{ id: 1 }, { id: 2 }]).toContainEqual({ id: 1 });
+```
+
+### `toHaveLength(number)`
+
+```javascript
+expect([1, 2, 3]).toHaveLength(3);
+expect('hello').toHaveLength(5);
+```
+
+## Objects
+
+### `toHaveProperty(keyPath, value?)`
+
+```javascript
+expect({ name: 'Steve' }).toHaveProperty('name');
+expect({ name: 'Steve' }).toHaveProperty('name', 'Steve');
+
+// Nested properties
+expect({ user: { age: 25 } }).toHaveProperty('user.age', 25);
+```
+
+### `toMatchObject(object)`
+
+Subset matching for objects.
+
+```javascript
+expect({
+  name: 'Steve',
+  age: 30,
+  location: 'Overworld'
+}).toMatchObject({
+  name: 'Steve',
+  age: 30
+});
+```
+
+## Exceptions
+
+### `toThrow(expected?)`
+
+```javascript
+const fn = () => { throw new Error('Oops'); };
+
+expect(fn).toThrow();
+expect(fn).toThrow('Oops');
+expect(fn).toThrow(/Oops/);
+expect(fn).toThrow(Error);
+```
+
+### `toThrowAsync(expected?)`
+
+Async version for async functions.
+
+```javascript
+const asyncFn = async () => { throw new Error('Async error'); };
+
+await expect(asyncFn).toThrowAsync();
+await expect(asyncFn).toThrowAsync('Async error');
+await expect(asyncFn).toThrowAsync(/error/);
+```
+
+## Types
+
+### `toBeInstanceOf(class)`
+
+```javascript
+expect(new Date()).toBeInstanceOf(Date);
+expect(new Error()).toBeInstanceOf(Error);
+expect([]).toBeInstanceOf(Array);
+```
+
+## Negation
+
+All matchers support `.not`:
+
+```javascript
+expect(5).not.toBe(10);
+expect(null).not.toBeTruthy();
+expect([1, 2, 3]).not.toContain(4);
+expect({ name: 'test' }).not.toHaveProperty('age');
+expect(() => 'success').not.toThrow();
+
+// Async matchers
+await expect(player).not.toHaveReceivedMessage('Error');
+await expect(player).not.toContainItem('bedrock');
+```
+
+## Complete Example
+
+```javascript
+import { test, expect } from '@drownek/paper-e2e-runner';
+
+test('comprehensive test example', async ({ player, server }) => {
+  // Minecraft-specific assertions
+  await player.chat('/help');
+  await expect(player).toHaveReceivedMessage('Available');
+  
+  await server.execute(`give ${player.username} diamond 5`);
+  await expect(player).toContainItem('diamond');
+  
+  // Standard assertions
+  const count = player.inventory.items().length;
+  expect(count).toBeGreaterThan(0);
+  expect(count).toBeLessThanOrEqual(36);
+  
+  const item = player.inventory.items()[0];
+  expect(item).toBeTruthy();
+  expect(item.name).toMatch('diamond');
+});
+```
+
+## Tips
+
+1. **Use appropriate matchers:** `toBe()` for primitives, `toEqual()` for objects/arrays
+2. **Async matchers must be awaited:** `toHaveReceivedMessage`, `toContainItem`, `toHaveLore`, `toThrowAsync`
+3. **Use the most specific matcher** for your use case — it produces clearer failure messages
+4. **All matchers support `.not`** for negation
+5. **Minecraft matchers have a 5-second default timeout**
+
+## Error Messages
+
+When assertions fail, you get clear messages:
+
+```
+AssertionError: Expected 5 to be greater than 10
+AssertionError: Expected [1, 2, 3] to contain 4
+AssertionError: Expected function to throw an error, but it did not
+AssertionError: Expected player to receive message "Welcome" within 5000ms
+```

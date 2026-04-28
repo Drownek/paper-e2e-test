@@ -1,0 +1,33 @@
+name: Sync Wiki
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  publish-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+        with:
+          path: main
+
+      - name: Checkout wiki repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository }}.wiki
+          path: wiki
+          # Using standard GITHUB_TOKEN usually works, but if it fails,
+          # you may need to add a PAT as a secret and use it here.
+
+      - name: Sync docs to wiki
+        run: |
+          cp -a main/docs/. wiki/
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "docs: sync from main repository docs directory" || echo "No changes to commit"
+          git push
