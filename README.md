@@ -17,6 +17,22 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 
 ## Quick Start
 
+1. Setup build.gradle.kts:
+```kotlin
+plugins {
+    id("io.github.drownek.paper-e2e") version "1.3.0"
+}
+
+e2e {
+    minecraftVersion.set("1.19.4")
+    runDir.set("run")
+    testsDir.set(file("src/test/e2e"))
+    acceptEula.set(true)
+}
+```
+2. Init tests folder: `./gradlew initE2E`
+3. Run tests: `./gradlew testE2E`
+
 Please refer to the [Getting Started](https://github.com/Drownek/paper-e2e-test/wiki/Getting-Started) guide for detailed setup instructions.
 
 ## Documentation
