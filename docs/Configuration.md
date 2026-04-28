@@ -2,6 +2,23 @@
 
 Complete reference for Gradle plugin configuration options.
 
+## Table of Contents
+
+- [Basic Configuration](#basic-configuration)
+- [Configuration Options](#configuration-options)
+  - [`minecraftVersion`](#minecraftversion)
+  - [`runDir`](#rundir)
+  - [`testsDir`](#testsdir)
+  - [`acceptEula`](#accepteula)
+  - [`cleanExcludePatterns`](#cleanexcludepatterns)
+  - [`useExternalPluginsOnly`](#useexternalpluginsonly)
+  - [`downloadPlugins`](#downloadplugins)
+  - [`writeFiles`](#writefiles)
+- [Complete Example](#complete-example)
+- [Next Steps](#next-steps)
+
+---
+
 ## Basic Configuration
 
 In your `build.gradle.kts`:

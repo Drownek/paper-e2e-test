@@ -2,6 +2,40 @@
 
 Testing Minecraft inventory GUIs is a core feature of the framework. The v1.3.0 API uses live handles and locators, inspired by Playwright, for reactive and reliable GUI interactions.
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Core Concepts](#core-concepts)
+  - [Live Handles vs Snapshots](#live-handles-vs-snapshots)
+  - [Locators](#locators)
+- [Modern API (v1.1.0+)](#modern-api-v110)
+  - [`player.gui({ title, timeout? })`](#playergui-title-timeout-)
+  - [`gui.locator(predicate)`](#guilocatorpredicate)
+  - [`locator.click(options?)`](#locatorclickoptions)
+  - [`locator.displayName()`](#locatordisplayname)
+  - [`locator.loreText()`](#locatorloretext)
+  - [`expect(locator).toHaveLore(text, options?)`](#expectlocatortohaveloretext-options)
+  - [`gui.title`](#guititle)
+- [Complete Examples](#complete-examples)
+  - [Permission Test](#permission-test)
+  - [Item Interaction](#item-interaction)
+  - [Dynamic Lore Testing](#dynamic-lore-testing)
+  - [Paginated GUIs](#paginated-guis)
+- [Player Helper Methods](#player-helper-methods)
+  - [`player.makeOp()`](#playermakeop)
+  - [`player.deOp()`](#playerdeop)
+  - [`player.setGameMode(mode)`](#playersetgamemodemode)
+  - [`player.teleport(x, y, z)`](#playerteleportx-y-z)
+  - [`player.giveItem(item, count?)`](#playergiveitemitem-count)
+- [Legacy API (Deprecated)](#legacy-api-deprecated)
+  - [`player.waitForGui(guiMatcher, options?)`](#playerwaitforguiguimatcher-options)
+  - [`gui.findItem(predicate)`](#guifinditempredicate)
+  - [`gui.clickItem(predicate)`](#guiclickitempredicate)
+- [Tips](#tips)
+- [Next Steps](#next-steps)
+
+---
+
 ## Quick Start
 
 ```javascript
@@ -57,13 +91,13 @@ Gets a live handle to a GUI matching the title pattern.
 **Examples:**
 ```javascript
 // String match
-const gui = await player.gui({ title: 'Shop' });
+const guiStr = await player.gui({ title: 'Shop' });
 
 // RegEx match
-const gui = await player.gui({ title: /Staff Activity/i });
+const guiRegex = await player.gui({ title: /Staff Activity/i });
 
 // Custom timeout
-const gui = await player.gui({ title: 'Admin', timeout: 10000 });
+const guiTimeout = await player.gui({ title: 'Admin', timeout: 10000 });
 ```
 
 ### `gui.locator(predicate)`
@@ -81,13 +115,13 @@ Creates a locator for items matching the predicate.
 const compass = gui.locator(i => i.name === 'compass');
 
 // By display name
-const item = gui.locator(i => i.getDisplayName().includes('Session'));
+const itemByName = gui.locator(i => i.getDisplayName().includes('Session'));
 
 // By lore
-const item = gui.locator(i => i.hasLore('Click to view'));
+const itemByLore = gui.locator(i => i.hasLore('Click to view'));
 
 // Multiple conditions
-const item = gui.locator(i => 
+const complexItem = gui.locator(i => 
   i.name === 'paper' && i.count > 1
 );
 ```
@@ -289,10 +323,10 @@ Use `player.gui({ title })` instead.
 **Migration:**
 ```javascript
 // Old
-const gui = await player.waitForGui(g => g.title.includes('Shop'));
+const oldGui = await player.waitForGui(g => g.title.includes('Shop'));
 
 // New
-const gui = await player.gui({ title: /Shop/ });
+const newGui = await player.gui({ title: /Shop/ });
 ```
 
 ### `gui.findItem(predicate)` ⚠️ Deprecated
@@ -302,10 +336,10 @@ Use `gui.locator(predicate)` instead.
 **Migration:**
 ```javascript
 // Old
-const item = gui.findItem(i => i.name === 'diamond');
+const oldItem = gui.findItem(i => i.name === 'diamond');
 
 // New
-const item = gui.locator(i => i.name === 'diamond');
+const newItem = gui.locator(i => i.name === 'diamond');
 ```
 
 ### `gui.clickItem(predicate)` ⚠️ Deprecated

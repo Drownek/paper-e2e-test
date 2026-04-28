@@ -2,6 +2,20 @@
 
 Real-world test examples for common plugin features.
 
+## Table of Contents
+
+- [More Examples](#more-examples)
+- [Basic Command Testing](#basic-command-testing)
+- [Economy Plugin](#economy-plugin)
+- [Shop System](#shop-system)
+- [Teleport System](#teleport-system)
+- [Kits System](#kits-system)
+- [Minigame System](#minigame-system)
+- [Event-Based Testing](#event-based-testing)
+- [Next Steps](#next-steps)
+
+---
+
 ## More Examples
 
 For additional TypeScript test examples, see the [StaffActivityMonitor project](https://github.com/Drownek/StaffActivityMonitor/tree/master/bukkit/src/test/e2e).

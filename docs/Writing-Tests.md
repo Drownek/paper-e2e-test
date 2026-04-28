@@ -113,13 +113,15 @@ See [Matchers Reference](Matchers-Reference) for all available assertions.
 The framework provides several exported utilities for advanced waiting and polling:
 
 ```javascript
-import { sleep, poll, waitForAssertion, waitUntil, waitForStable } from '@drownek/paper-e2e-runner';
+import { test, sleep, poll, waitForAssertion, waitUntil, waitForStable } from '@drownek/paper-e2e-runner';
 
-// Sleep for 1 second
-await sleep(1000);
+test('advanced waiting', async ({ player }) => {
+  // Sleep for 1 second
+  await sleep(1000);
 
-// Wait until a condition remains continuously true for 2 seconds
-await waitForStable(() => player.bot.health === 20, { duration: 2000, timeout: 5000 });
+  // Wait until a condition remains continuously true for 2 seconds
+  await waitForStable(() => player.bot.health === 20, { duration: 2000, timeout: 5000 });
+});
 ```
 
 ## Best Practices

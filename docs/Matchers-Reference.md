@@ -2,6 +2,44 @@
 
 Complete reference for all available assertion matchers.
 
+## Table of Contents
+
+- [Minecraft-Specific Matchers](#minecraft-specific-matchers)
+  - [`toHaveReceivedMessage(message, options?)`](#tohavereceivedmessagemessage-options)
+  - [`toContainItem(itemName)`](#tocontainitemitemname)
+  - [`toHaveLore(text, options?)`](#tohaveloretext-options)
+- [Basic Equality](#basic-equality)
+  - [`toBe(value)`](#tobevalue)
+  - [`toEqual(value)`](#toequalvalue)
+- [Truthiness](#truthiness)
+  - [`toBeTruthy()` / `toBeFalsy()`](#tobetruthy-tobefalsy)
+  - [`toBeNull()` / `toBeUndefined()` / `toBeDefined()`](#tobenull-tobeundefined-tobedefined)
+  - [`toBeNaN()`](#tobenan)
+- [Numbers](#numbers)
+  - [`toBeGreaterThan()` / `toBeGreaterThanOrEqual()`](#tobegreaterthan-tobegreaterthanorequal)
+  - [`toBeLessThan()` / `toBeLessThanOrEqual()`](#tobelessthan-tobelessthanorequal)
+  - [`toBeCloseTo(number, precision?)`](#tobeclosetonumber-precision)
+- [Strings](#strings)
+  - [`toMatch(regexOrString)`](#tomatchregexorstring)
+  - [`toContain(substring)`](#tocontainsubstring)
+- [Arrays and Collections](#arrays-and-collections)
+  - [`toContainEqual(item)`](#tocontainequalitem)
+  - [`toHaveLength(number)`](#tohavelengthnumber)
+- [Objects](#objects)
+  - [`toHaveProperty(keyPath, value?)`](#tohavepropertykeypath-value)
+  - [`toMatchObject(object)`](#tomatchobjectobject)
+- [Exceptions](#exceptions)
+  - [`toThrow(expected?)`](#tothrowexpected)
+  - [`toThrowAsync(expected?)`](#tothrowasyncexpected)
+- [Types](#types)
+  - [`toBeInstanceOf(class)`](#tobeinstanceofclass)
+- [Negation](#negation)
+- [Complete Example](#complete-example)
+- [Tips](#tips)
+- [Error Messages](#error-messages)
+
+---
+
 ## Minecraft-Specific Matchers
 
 ### `toHaveReceivedMessage(message, options?)`

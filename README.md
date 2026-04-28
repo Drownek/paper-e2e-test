@@ -17,6 +17,15 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 
 ## Quick Start
 
+### Prerequisites
+
+- Java 17 or higher
+- Gradle 7.0 or higher
+- Node.js 16 or higher
+- A Paper/Spigot plugin project
+
+### Installation
+
 1. Setup build.gradle.kts:
 ```kotlin
 plugins {
@@ -45,7 +54,6 @@ See the [GitHub Wiki](../../wiki) for comprehensive guides:
 - [GUI Testing](../../wiki/GUI-Testing) - Testing inventory GUIs
 - [TypeScript Support](../../wiki/TypeScript-Support) - Using TypeScript
 - [Configuration](../../wiki/Configuration) - Gradle plugin options
-- [Troubleshooting](../../wiki/Troubleshooting) - Common issues
 
 ## License
 
