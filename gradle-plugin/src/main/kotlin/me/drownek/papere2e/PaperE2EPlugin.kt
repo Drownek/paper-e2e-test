@@ -100,7 +100,7 @@ class PaperE2EPlugin : Plugin<Project> {
             }
         }
 
-        project.tasks.register("initPaperE2eTest") {
+        project.tasks.register("initE2E") {
             group = "verification"
             description = "Interactively initializes a paper-e2e-test environment with required configs and an initial test file."
             doLast {
@@ -108,12 +108,12 @@ class PaperE2EPlugin : Plugin<Project> {
                 val propertyDir = project.findProperty("e2eDir") as? String
 
                 val inputDir = propertyDir ?: run {
-                    println("Enter the test directory location [default: $defaultDir]:")
+                    project.logger.lifecycle("Enter the test directory location [default: $defaultDir]:")
                     val consoleInput = readlnOrNull()?.trim()
                     if (consoleInput.isNullOrEmpty()) defaultDir else consoleInput
                 }
 
-                println("Using directory: $inputDir")
+                project.logger.lifecycle("Using directory: $inputDir")
 
                 val projectRootDir = project.projectDir.canonicalFile
                 val targetDir = projectRootDir.resolve(inputDir).canonicalFile
@@ -147,7 +147,7 @@ class PaperE2EPlugin : Plugin<Project> {
                         }
                         """.trimIndent()
                     )
-                    println("Created: ${packageJson.absolutePath}")
+                    project.logger.lifecycle("Created: ${packageJson.absolutePath}")
                 }
 
                 val tsconfigJson = targetDir.resolve("tsconfig.json")
@@ -180,7 +180,7 @@ class PaperE2EPlugin : Plugin<Project> {
                         }
                         """.trimIndent()
                     )
-                    println("Created: ${tsconfigJson.absolutePath}")
+                    project.logger.lifecycle("Created: ${tsconfigJson.absolutePath}")
                 }
 
                 val testFile = targetDir.resolve("example.spec.ts")
@@ -195,10 +195,10 @@ class PaperE2EPlugin : Plugin<Project> {
                         });
                         """.trimIndent()
                     )
-                    println("Created: ${testFile.absolutePath}")
+                    project.logger.lifecycle("Created: ${testFile.absolutePath}")
                 }
 
-                println("Executing 'npm install' in ${targetDir.absolutePath}...")
+                project.logger.lifecycle("Executing 'npm install' in ${targetDir.absolutePath}...")
                 val isWindows = System.getProperty("os.name").lowercase().contains("windows")
                 val npmCommand = if (isWindows) "npm.cmd" else "npm"
 
@@ -212,7 +212,8 @@ class PaperE2EPlugin : Plugin<Project> {
                     if (execResult.exitValue != 0) {
                         throw GradleException("EXEC ERROR: 'npm install' failed with exit code ${execResult.exitValue}.")
                     }
-                    println("Dependencies installed successfully.")
+                    project.logger.lifecycle("Dependencies installed successfully. 🎉")
+                    project.logger.lifecycle("\nYou're all set! Run tests with: ./gradlew testE2E")
                 } catch (e: Exception) {
                     if (e is GradleException) throw e
                     throw GradleException("EXEC FATAL: Failed to launch npm process. Original error: ${e.message}", e)
@@ -224,7 +225,7 @@ class PaperE2EPlugin : Plugin<Project> {
         // when one of our E2E tasks is actually in the task graph.
         project.gradle.taskGraph.whenReady {
             val ours = allTasks.any { task ->
-                task.project === project && (task.name == "testE2E" || task.name == "cleanE2E")
+                task.project === project && (task.name == "testE2E" || task.name == "cleanE2E" || task.name == "initE2E")
             }
             if (ours) Banner.print(project.logger)
         }
