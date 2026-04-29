@@ -12,12 +12,12 @@ Complete reference for all available assertion matchers.
   - [`toBe(value)`](#tobevalue)
   - [`toEqual(value)`](#toequalvalue)
 - [Truthiness](#truthiness)
-  - [`toBeTruthy()` / `toBeFalsy()`](#tobetruthy-tobefalsy)
-  - [`toBeNull()` / `toBeUndefined()` / `toBeDefined()`](#tobenull-tobeundefined-tobedefined)
+  - [`toBeTruthy()` / `toBeFalsy()`](#tobetruthy--tobefalsy)
+  - [`toBeNull()` / `toBeUndefined()` / `toBeDefined()`](#tobenull--tobeundefined--tobedefined)
   - [`toBeNaN()`](#tobenan)
 - [Numbers](#numbers)
-  - [`toBeGreaterThan()` / `toBeGreaterThanOrEqual()`](#tobegreaterthan-tobegreaterthanorequal)
-  - [`toBeLessThan()` / `toBeLessThanOrEqual()`](#tobelessthan-tobelessthanorequal)
+  - [`toBeGreaterThan()` / `toBeGreaterThanOrEqual()`](#tobegreaterthan--tobegreaterthanorequal)
+  - [`toBeLessThan()` / `toBeLessThanOrEqual()`](#tobelessthan--tobelessthanorequal)
   - [`toBeCloseTo(number, precision?)`](#tobeclosetonumber-precision)
 - [Strings](#strings)
   - [`toMatch(regexOrString)`](#tomatchregexorstring)
@@ -153,7 +153,7 @@ expect(undefined).toBeFalsy();
 expect(null).toBeNull();
 expect(undefined).toBeUndefined();
 expect(0).toBeDefined();
-expect(null).toBeDefined();  // null is defined, just null
+expect(null).toBeDefined();  // Passes, as null is not undefined
 ```
 
 ### `toBeNaN()`

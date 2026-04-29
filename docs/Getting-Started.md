@@ -38,7 +38,7 @@ To automatically scaffold your tests directory, `package.json`, `tsconfig.json`,
 
 This command will prompt you for the test directory location (defaulting to `src/test/e2e`), set up TypeScript, install dependencies, and generate an `example.spec.ts` file so you can get started immediately.
 
-### 4. Run Tests
+### 3. Run Tests
 
 ```bash
 ./gradlew testE2E

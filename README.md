@@ -7,13 +7,19 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 
 ## Features
 
-* 🚀 **Fast & Simple Setup** – Start testing in minutes with automated server lifecycle management and Paper server downloads.
-* 🎮 **Realistic Bot Testing** – Powered by Mineflayer for authentic player interaction.
-* 🎭 **Playwright-inspired API** – Familiar patterns using live handles and locators for intuitive scripting.
-* 🧪 **Type-Safe** – Native JavaScript and TypeScript support with full type safety.
-* 🔄 **Automatic Retries** – Built-in retry logic to eliminate flaky tests and ensure stability.
-* 📊 **Rich Assertions** – Custom matchers specifically designed for Minecraft mechanics.
-* 🔧 **Gradle Integration** – Run your entire suite with a single command.
+`🚀` **Fast & Simple Setup** – Start testing in minutes with automated server lifecycle management and Paper server downloads.
+
+`🎮` **Realistic Bot Testing** – Powered by Mineflayer for authentic player interaction.
+
+`🎭` **Playwright-inspired API** – Familiar patterns using live handles and locators for intuitive scripting.
+
+`🧪` **Type-Safe** – Native JavaScript and TypeScript support with full type safety.
+
+`🔄` **Automatic Retries** – Built-in retry logic to eliminate flaky tests and ensure stability.
+
+`📊` **Rich Assertions** – Custom matchers specifically designed for Minecraft mechanics.
+
+`🔧` **Gradle Integration** – Run your entire suite with a single command.
 
 ## Quick Start
 
@@ -52,8 +58,8 @@ See the [GitHub Wiki](../../wiki) for comprehensive guides:
 - [Writing Tests](../../wiki/Writing-Tests) - Test examples and patterns
 - [Matchers Reference](../../wiki/Matchers-Reference) - All available assertions
 - [GUI Testing](../../wiki/GUI-Testing) - Testing inventory GUIs
-- [TypeScript Support](../../wiki/TypeScript-Support) - Using TypeScript
 - [Configuration](../../wiki/Configuration) - Gradle plugin options
+- [Test Filtering](../../wiki/Test-Filtering) - Running specific tests
 
 ## License
 

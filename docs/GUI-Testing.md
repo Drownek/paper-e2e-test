@@ -1,6 +1,6 @@
 # GUI Testing
 
-Testing Minecraft inventory GUIs is a core feature of the framework. The v1.3.1 API uses live handles and locators, inspired by Playwright, for reactive and reliable GUI interactions.
+Testing Minecraft inventory GUIs is a core feature of the framework. The v1.3.0+ API uses live handles and locators, inspired by Playwright, for reactive and reliable GUI interactions.
 
 ## Table of Contents
 
