@@ -30,7 +30,6 @@ function bumpVersionFiles(newVersion) {
 
     const gradleFiles = [
         "README.md",
-        "docs/Configuration.md",
         "docs/Getting-Started.md",
         "example_plugin/build.gradle.kts",
     ];
@@ -99,7 +98,6 @@ async function main() {
         bumpVersionFiles(newVersion);
         changedSourceFiles.push(
             "README.md",
-            "docs/Configuration.md",
             "docs/Getting-Started.md",
             "example_plugin/build.gradle.kts",
             "gradle-plugin/src/main/kotlin/me/drownek/papere2e/PaperE2EPlugin.kt",

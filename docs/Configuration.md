@@ -163,11 +163,6 @@ e2e {
 ## Complete Example
 
 ```kotlin
-plugins {
-    id("io.github.drownek.paper-e2e") version "1.3.1"
-    id("com.github.johnrengelman.shadow") version "8.1.1"
-}
-
 e2e {
     // Server configuration
     minecraftVersion.set("1.19.4")
