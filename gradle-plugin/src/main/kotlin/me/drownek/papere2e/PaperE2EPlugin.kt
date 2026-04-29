@@ -137,7 +137,7 @@ class PaperE2EPlugin : Plugin<Project> {
                             "test": "tsc && paper-e2e-runner"
                           },
                           "dependencies": {
-                            "@drownek/paper-e2e-runner": "^1.3.0"
+                            "@drownek/paper-e2e-runner": "^1.3.1"
                           },
                           "devDependencies": {
                             "@types/node": "^22.10.5",

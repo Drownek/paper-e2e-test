@@ -29,7 +29,7 @@ End-to-end testing framework for Paper/Spigot Minecraft plugins with support for
 1. Setup build.gradle.kts:
 ```kotlin
 plugins {
-    id("io.github.drownek.paper-e2e") version "1.3.0"
+    id("io.github.drownek.paper-e2e") version "1.3.1"
 }
 
 e2e {

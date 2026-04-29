@@ -12,7 +12,7 @@ In your `src/test/e2e/package.json`:
 {
   "type": "module",
   "dependencies": {
-    "@drownek/paper-e2e-runner": "^1.3.0"
+    "@drownek/paper-e2e-runner": "^1.3.1"
   },
   "devDependencies": {
     "typescript": "^5.0.0",

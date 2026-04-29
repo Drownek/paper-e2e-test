@@ -164,7 +164,7 @@ e2e {
 
 ```kotlin
 plugins {
-    id("io.github.drownek.paper-e2e") version "1.3.0"
+    id("io.github.drownek.paper-e2e") version "1.3.1"
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
