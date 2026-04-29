@@ -9,15 +9,59 @@ function prompt(question) {
     return new Promise((resolve) => rl.question(question, (ans) => { rl.close(); resolve(ans.trim()); }));
 }
 
+// Updated to take a regex pattern and a replacement string directly
+function replaceRegexInFile(filePath, regex, replacement) {
+    if (!fs.existsSync(filePath)) {
+        console.warn(`  Warning: ${filePath} not found, skipping.`);
+        return;
+    }
+    const content = fs.readFileSync(filePath, "utf8");
+    const updated = content.replace(regex, replacement);
+    if (updated === content) {
+        console.warn(`  Warning: pattern not found in ${filePath}, skipping.`);
+        return;
+    }
+    fs.writeFileSync(filePath, updated, "utf8");
+    console.log(`  Updated ${filePath}`);
+}
+
+function bumpVersionFiles(newVersion) {
+    console.log("\nUpdating version references in source files...");
+
+    const gradleFiles = [
+        "README.md",
+        "docs/Configuration.md",
+        "docs/Getting-Started.md",
+        "example_plugin/build.gradle.kts",
+    ];
+
+    // Matches any version inside the quotes, e.g., id("...") version "1.x.x"
+    for (const file of gradleFiles) {
+        replaceRegexInFile(
+            file,
+            /id\("io\.github\.drownek\.paper-e2e"\) version "[^"]+"/g,
+            `id("io.github.drownek.paper-e2e") version "${newVersion}"`
+        );
+    }
+
+    // Matches any version after the package name, e.g., "@drownek/paper-e2e-runner": "^1.x.x"
+    replaceRegexInFile(
+        "gradle-plugin/src/main/kotlin/me/drownek/papere2e/PaperE2EPlugin.kt",
+        /"@drownek\/paper-e2e-runner": "\^[^"]+"/g,
+        `"@drownek/paper-e2e-runner": "^${newVersion}"`
+    );
+}
+
 async function main() {
     let newVersion = process.argv[2];
 
+    const oldVersion = fs.existsSync("version.txt")
+        ? fs.readFileSync("version.txt", "utf8").trim()
+        : "";
+
     if (!newVersion) {
-        const current = fs.existsSync("version.txt")
-            ? fs.readFileSync("version.txt", "utf8").trim()
-            : "";
-        newVersion = await prompt(`Version [${current}]: `);
-        newVersion = newVersion || current;
+        newVersion = await prompt(`Version [${oldVersion}]: `);
+        newVersion = newVersion || oldVersion;
     }
 
     if (!newVersion) {
@@ -30,6 +74,8 @@ async function main() {
         process.exit(1);
     }
 
+    const isPrerelease = newVersion.includes("-");
+
     // update version.txt
     fs.writeFileSync("version.txt", newVersion + "\n");
 
@@ -39,14 +85,42 @@ async function main() {
         { cwd: "runner-package", stdio: "inherit" }
     );
 
-    // commit only the version files
+    // update the lockfile in the example plugin
+    console.log("\nUpdating lockfile in example_plugin...");
     execSync(
-        `git commit -m "chore: bump to ${newVersion}" -- version.txt runner-package/package.json runner-package/package-lock.json`,
+        `npm install --package-lock-only`,
+        { cwd: "example_plugin/src/test/e2e", stdio: "inherit" }
+    );
+
+    // bump version references in source files only for stable releases
+    const changedSourceFiles = [];
+    if (!isPrerelease) {
+        // We no longer require `oldVersion` to match exactly, we just pass `newVersion`
+        bumpVersionFiles(newVersion);
+        changedSourceFiles.push(
+            "README.md",
+            "docs/Configuration.md",
+            "docs/Getting-Started.md",
+            "example_plugin/build.gradle.kts",
+            "gradle-plugin/src/main/kotlin/me/drownek/papere2e/PaperE2EPlugin.kt",
+        );
+    }
+
+    // commit version files (+ source files if updated)
+    const filesToCommit = [
+        "version.txt",
+        "runner-package/package.json",
+        "runner-package/package-lock.json",
+        "example_plugin/src/test/e2e/package-lock.json",
+        ...changedSourceFiles,
+    ].join(" ");
+
+    execSync(
+        `git commit -m "chore: bump to ${newVersion}" -- ${filesToCommit}`,
         { stdio: "inherit" }
     );
 
     // optionally create an annotated tag
-    const isPrerelease = newVersion.includes("-");
     const tagAnswer = await prompt(`Create tag v${newVersion}? [${isPrerelease ? "y/N" : "Y/n"}] `);
     const createTag = isPrerelease
         ? tagAnswer.toLowerCase() === "y"
