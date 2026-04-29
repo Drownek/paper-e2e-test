@@ -95,5 +95,4 @@ your-plugin/
 
 - [Writing Tests](Writing-Tests) - Learn testing patterns and best practices
 - [Configuration](Configuration) - Customize cleanup behavior and other settings
-- [TypeScript Support](TypeScript-Support) - Set up TypeScript for type safety
 - [GUI Testing](GUI-Testing) - Test inventory menus and GUIs

@@ -40,7 +40,7 @@ Testing Minecraft inventory GUIs is a core feature of the framework. The v1.3.1 
 
 ```javascript
 test('interact with shop GUI', async ({ player }) => {
-  await player.chat('/shop');
+  player.chat('/shop');
   
   // Get a live handle to the GUI
   const gui = await player.gui({ title: /Shop/ });
@@ -199,13 +199,13 @@ console.log(gui.title); // "Shop Menu"
 ### Permission Test
 ```javascript
 test('command requires permission', async ({ player }) => {
-  await player.chat('/admin');
+  player.chat('/admin');
   await expect(player).toHaveReceivedMessage('You don\'t have permission');
 });
 
 test('admin can open admin panel', async ({ player }) => {
   await player.makeOp();
-  await player.chat('/admin');
+  player.chat('/admin');
   
   const gui = await player.gui({ title: 'Admin' });
   expect(gui.title).toContain('Admin');
@@ -216,7 +216,7 @@ test('admin can open admin panel', async ({ player }) => {
 ```javascript
 test('clicking GUI item triggers callback', async ({ player }) => {
   await player.makeOp();
-  await player.chat('/example gui-settings');
+  player.chat('/example gui-settings');
   
   const gui = await player.gui({ title: 'guiSettings' });
   const item = gui.locator(item => item.getDisplayName().includes('guiItemInfo'));
@@ -230,7 +230,7 @@ test('clicking GUI item triggers callback', async ({ player }) => {
 ```javascript
 test('activity log shows correct data', async ({ player }) => {
   await player.makeOp();
-  await player.chat('/staffactivity view');
+  player.chat('/staffactivity view');
   
   const gui = await player.gui({ title: /Staff activity/ });
   
@@ -249,7 +249,7 @@ test('activity log shows correct data', async ({ player }) => {
 ### Paginated GUIs
 ```javascript
 test('navigate through pages', async ({ player }) => {
-  await player.chat('/warps');
+  player.chat('/warps');
   const gui = await player.gui({ title: 'Warps' });
   
   // Check first page
@@ -257,7 +257,7 @@ test('navigate through pages', async ({ player }) => {
   await firstItem.click();
   
   // Reopen and check next page
-  await player.chat('/warps');
+  player.chat('/warps');
   const nextButton = gui.locator(i => i.name === 'arrow');
   await nextButton.click();
   
@@ -274,7 +274,7 @@ Grants operator status to the player.
 
 ```javascript
 await player.makeOp();
-await player.chat('/admin'); // Now has permission
+player.chat('/admin'); // Now has permission
 ```
 
 ### `player.deOp()`

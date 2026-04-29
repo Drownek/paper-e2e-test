@@ -13,5 +13,4 @@
 
 ## Advanced
 
-- [TypeScript Support](TypeScript-Support)
 - [Examples](Examples)

@@ -58,7 +58,7 @@ await expect(player).toHaveReceivedMessage('Welcome to the server!', { strict: t
 
 // Scoped to messages received after a specific point
 const marker = player.getMessageBufferIndex();
-await player.chat('/action');
+player.chat('/action');
 await expect(player).toHaveReceivedMessage('Success', { since: marker });
 
 // Negation
@@ -323,10 +323,10 @@ import { test, expect } from '@drownek/paper-e2e-runner';
 
 test('comprehensive test example', async ({ player, server }) => {
   // Minecraft-specific assertions
-  await player.chat('/help');
+  player.chat('/help');
   await expect(player).toHaveReceivedMessage('Available');
   
-  await server.execute(`give ${player.username} diamond 5`);
+  server.execute(`give ${player.username} diamond 5`);
   await expect(player).toContainItem('diamond');
   
   // Standard assertions

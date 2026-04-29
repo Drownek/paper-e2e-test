@@ -190,5 +190,4 @@ e2e {
 
 - [Writing Tests](Writing-Tests) - Learn testing patterns and best practices
 - [Test Filtering](Test-Filtering) - Run specific tests by file or name
-- [TypeScript Support](TypeScript-Support) - Set up TypeScript for type safety
 - [GUI Testing](GUI-Testing) - Test inventory menus and GUIs

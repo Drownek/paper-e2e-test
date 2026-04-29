@@ -31,12 +31,12 @@ test('player receives welcome message', async ({ player }) => {
 
 ```javascript
 test('help command works', async ({ player }) => {
-  await player.chat('/help');
+  player.chat('/help');
   await expect(player).toHaveReceivedMessage('Available commands');
 });
 
 test('admin command requires permission', async ({ player }) => {
-  await player.chat('/admin reload');
+  player.chat('/admin reload');
   await expect(player).toHaveReceivedMessage('No permission');
 });
 ```
@@ -45,13 +45,13 @@ test('admin command requires permission', async ({ player }) => {
 
 ```javascript
 test('player starts with default balance', async ({ player }) => {
-  await player.chat('/balance');
+  player.chat('/balance');
   await expect(player).toHaveReceivedMessage('$1000');
 });
 
 test('player can purchase items', async ({ player, server }) => {
-  await server.execute(`eco give ${player.username} 500`);
-  await player.chat('/buy diamond');
+  server.execute(`eco give ${player.username} 500`);
+  player.chat('/buy diamond');
   await expect(player).toHaveReceivedMessage('Purchased');
   await expect(player).toContainItem('diamond');
 });
@@ -61,7 +61,7 @@ test('player can purchase items', async ({ player, server }) => {
 
 ```javascript
 test('player inventory has starter items', async ({ player }) => {
-  await player.chat('/starter');
+  player.chat('/starter');
   await expect(player).toContainItem('diamond_sword');
   await expect(player).toContainItem('bread');
 });
@@ -72,7 +72,7 @@ test('player inventory has starter items', async ({ player }) => {
 ```javascript
 test('server executes commands', async ({ player, server }) => {
   await player.makeOp();
-  await server.execute(`give ${player.username} diamond 64`);
+  server.execute(`give ${player.username} diamond 64`);
   await expect(player).toContainItem('diamond');
 });
 ```
@@ -89,8 +89,8 @@ Each test receives a context object with:
 ### Player Actions
 
 ```javascript
-await player.chat('/command')        // Send chat/command
-await player.chat('Hello!')          // Send chat message
+player.chat('/command')        // Send chat/command
+player.chat('Hello!')          // Send chat message
 await player.gui({ title: 'Title' })     // Wait for GUI window
 player.inventory                     // Access inventory
 player.bot                           // Underlying Mineflayer bot

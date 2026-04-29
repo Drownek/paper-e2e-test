@@ -26,23 +26,23 @@ For additional TypeScript test examples, see the [StaffActivityMonitor project](
 import { test, expect } from '@drownek/paper-e2e-runner';
 
 test('help command shows available commands', async ({ player }) => {
-  await player.chat('/help');
+  player.chat('/help');
   await expect(player).toHaveReceivedMessage('Help: Index');
 });
 
 test('unknown command shows error', async ({ player }) => {
-  await player.chat('/nonexistent');
+  player.chat('/nonexistent');
   await expect(player).toHaveReceivedMessage('Unknown command');
 });
 
 test('permission-restricted command', async ({ player }) => {
-  await player.chat('/admin reload');
+  player.chat('/admin reload');
   await expect(player).toHaveReceivedMessage('no permission');
 });
 
 test('admin can use restricted command', async ({ player }) => {
   await player.makeOp();
-  await player.chat('/admin reload');
+  player.chat('/admin reload');
   await expect(player).toHaveReceivedMessage('Reloaded');
 });
 ```
@@ -51,21 +51,21 @@ test('admin can use restricted command', async ({ player }) => {
 
 ```javascript
 test('player starts with default balance', async ({ player }) => {
-  await player.chat('/balance');
+  player.chat('/balance');
   await expect(player).toHaveReceivedMessage('$1000');
 });
 
 test('player can send money', async ({ player, server }) => {
-  await server.execute(`eco give ${player.username} 500`);
-  await player.chat('/pay Test_xx 100');
+  server.execute(`eco give ${player.username} 500`);
+  player.chat('/pay Test_xx 100');
   await expect(player).toHaveReceivedMessage('Sent $100');
   
-  await player.chat('/balance');
+  player.chat('/balance');
   await expect(player).toHaveReceivedMessage('$1400');
 });
 
 test('cannot send more money than balance', async ({ player }) => {
-  await player.chat('/pay Test_xx 999999');
+  player.chat('/pay Test_xx 999999');
   await expect(player).toHaveReceivedMessage('insufficient');
 });
 ```
@@ -74,7 +74,7 @@ test('cannot send more money than balance', async ({ player }) => {
 
 ```javascript
 test('shop opens with correct items', async ({ player }) => {
-  await player.chat('/shop');
+  player.chat('/shop');
   const gui = await player.gui({ title: 'Shop' });
   
   const diamond = gui.locator(item => item.name === 'diamond');
@@ -83,7 +83,7 @@ test('shop opens with correct items', async ({ player }) => {
 
 test('purchase item from shop', async ({ player }) => {
   await player.giveItem('emerald', 64); // Give currency
-  await player.chat('/shop');
+  player.chat('/shop');
   
   const gui = await player.gui({ title: 'Shop' });
   await gui.locator(item => item.name === 'diamond').click();
@@ -93,7 +93,7 @@ test('purchase item from shop', async ({ player }) => {
 });
 
 test('cannot buy without money', async ({ player }) => {
-  await player.chat('/shop');
+  player.chat('/shop');
   const gui = await player.gui({ title: 'Shop' });
   await gui.locator(item => item.name === 'diamond').click();
   
@@ -105,7 +105,7 @@ test('cannot buy without money', async ({ player }) => {
 
 ```javascript
 test('warp command teleports player', async ({ player }) => {
-  await player.chat('/warp spawn');
+  player.chat('/warp spawn');
   await expect(player).toHaveReceivedMessage('Teleported to spawn');
   
   const pos = player.bot.entity.position;
@@ -114,12 +114,12 @@ test('warp command teleports player', async ({ player }) => {
 });
 
 test('unknown warp shows error', async ({ player }) => {
-  await player.chat('/warp nonexistent');
+  player.chat('/warp nonexistent');
   await expect(player).toHaveReceivedMessage('Warp not found');
 });
 
 test('warp GUI lists available warps', async ({ player }) => {
-  await player.chat('/warps');
+  player.chat('/warps');
   const gui = await player.gui({ title: 'Warps' });
   
   const spawn = gui.locator(item => 
@@ -136,7 +136,7 @@ test('warp GUI lists available warps', async ({ player }) => {
 
 ```javascript
 test('starter kit gives items', async ({ player }) => {
-  await player.chat('/kit starter');
+  player.chat('/kit starter');
   
   await expect(player).toHaveReceivedMessage('Received starter kit');
   await expect(player).toContainItem('diamond_sword');
@@ -144,15 +144,15 @@ test('starter kit gives items', async ({ player }) => {
 });
 
 test('kit has cooldown', async ({ player }) => {
-  await player.chat('/kit starter');
+  player.chat('/kit starter');
   await new Promise(resolve => setTimeout(resolve, 1000));
   
-  await player.chat('/kit starter');
+  player.chat('/kit starter');
   await expect(player).toHaveReceivedMessage('cooldown');
 });
 
 test('VIP kit requires permission', async ({ player }) => {
-  await player.chat('/kit vip');
+  player.chat('/kit vip');
   await expect(player).toHaveReceivedMessage('no permission');
 });
 ```
@@ -161,20 +161,20 @@ test('VIP kit requires permission', async ({ player }) => {
 
 ```javascript
 test('join arena game', async ({ player }) => {
-  await player.chat('/arena join');
+  player.chat('/arena join');
   await expect(player).toHaveReceivedMessage('Joined arena');
   
-  await player.chat('/arena leave');
+  player.chat('/arena leave');
   await expect(player).toHaveReceivedMessage('Left arena');
 });
 
 test('cannot join full arena', async ({ player, server }) => {
   // Fill arena with fake players
   for (let i = 0; i < 10; i++) {
-    await server.execute(`arena addplayer Player${i}`);
+    server.execute(`arena addplayer Player${i}`);
   }
   
-  await player.chat('/arena join');
+  player.chat('/arena join');
   await expect(player).toHaveReceivedMessage('Arena is full');
 });
 ```
